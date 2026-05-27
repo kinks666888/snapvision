@@ -115,7 +115,7 @@ npm run dev
 Default:
 
 ```bash
-http://localhost:5173
+http://localhost:3000
 ```
 
 ---
