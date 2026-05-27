@@ -58,7 +58,7 @@ npm install
 # 初始化数据库
 node db/init.js
 
-# 启动后端服务 (http://localhost:5000)
+# 启动后端服务 (http://localhost:5001)
 npm start
 
 # 开发模式 (自动重启)

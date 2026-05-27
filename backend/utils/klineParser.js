@@ -1,5 +1,14 @@
 /**
- * K线解析和模拟数据生成模块
+ * K线解析和股票信息提取模块
+ *
+ * extractStockInfo — 从文件名提取股票代码（仍在使用：OCR fallback）
+ *
+ * ══════════════════════════════════════════
+ * @deprecated 以下方法已由 marketService 替代：
+ *   - generateMockKlines  → marketService.getKlineData
+ *   - generateMockAnalysis → marketService.getStockInfo + getKlineData
+ *   保留代码以备离线测试使用，生产环境不再调用
+ * ══════════════════════════════════════════
  */
 
 class KlineParser {
@@ -52,6 +61,7 @@ class KlineParser {
 
   /**
    * 生成模拟 K 线数据
+   * @deprecated 使用 marketService.getKlineData(code, days) 获取真实数据
    * @param {number} days - 生成天数
    * @param {number} startPrice - 起始价格
    */
@@ -89,6 +99,7 @@ class KlineParser {
 
   /**
    * 生成单个股票的分析数据（模拟）
+   * @deprecated 使用 marketService.getStockInfo + getKlineData 获取真实数据
    */
   static generateMockAnalysis(stockCode, stockName) {
     const klines = this.generateMockKlines(60, 1500 + Math.random() * 500);

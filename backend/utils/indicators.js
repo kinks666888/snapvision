@@ -75,7 +75,7 @@ class Indicators {
       histogram: histogram[histogram.length - 1] || 0,
       macdLine,
       signalLine,
-      histogram
+      histogramArray: histogram
     };
   }
 
@@ -143,7 +143,78 @@ class Indicators {
   }
 
   /**
-   * 生成分析建议
+   * 一次性计算多周期 MA（使用 SMA）
+   * @param {number[]} prices - 收盘价数组
+   * @returns {{ ma5: number, ma10: number, ma20: number, ma60: number }}
+   */
+  static calculateAllMA(prices) {
+    const ma5Arr  = this.sma(prices, 5);
+    const ma10Arr = this.sma(prices, 10);
+    const ma20Arr = this.sma(prices, 20);
+    const ma60Arr = this.sma(prices, 60);
+
+    return {
+      ma5:  ma5Arr.length  > 0 ? Math.round(ma5Arr[ma5Arr.length - 1] * 100) / 100   : 0,
+      ma10: ma10Arr.length > 0 ? Math.round(ma10Arr[ma10Arr.length - 1] * 100) / 100 : 0,
+      ma20: ma20Arr.length > 0 ? Math.round(ma20Arr[ma20Arr.length - 1] * 100) / 100 : 0,
+      ma60: ma60Arr.length > 0 ? Math.round(ma60Arr[ma60Arr.length - 1] * 100) / 100 : 0,
+    };
+  }
+
+  /**
+   * 计算成交量均线（用于判断放量/缩量）
+   * @param {number[]} volumes - 成交量数组
+   * @param {number} period - 周期（默认 10）
+   * @returns {number} 均量
+   */
+  static avgVolume(volumes, period = 10) {
+    if (!volumes || volumes.length < period) return 0;
+    const slice = volumes.slice(-period);
+    const sum = slice.reduce((a, b) => a + b, 0);
+    return Math.round(sum / period);
+  }
+
+  /**
+   * 计算价格趋势强度
+   * 通过线性回归斜率判断近期趋势方向与力度
+   * @param {number[]} prices - 价格数组（最近 N 天）
+   * @returns {{ slope: number, direction: string, strength: string }}
+   */
+  static priceTrend(prices) {
+    if (!prices || prices.length < 5) {
+      return { slope: 0, direction: '横盘', strength: '弱' };
+    }
+
+    const n = prices.length;
+    const xMean = (n - 1) / 2;
+    const yMean = prices.reduce((a, b) => a + b, 0) / n;
+
+    let num = 0, den = 0;
+    for (let i = 0; i < n; i++) {
+      const dx = i - xMean;
+      num += dx * (prices[i] - yMean);
+      den += dx * dx;
+    }
+
+    const slope = den !== 0 ? num / den : 0;
+    const pctSlope = yMean !== 0 ? (slope / yMean) * 100 * n : 0;
+
+    let direction = '横盘';
+    let strength = '弱';
+
+    if (pctSlope > 1.5) {
+      direction = '上升';
+      strength = pctSlope > 3 ? '强' : '中等';
+    } else if (pctSlope < -1.5) {
+      direction = '下降';
+      strength = pctSlope < -3 ? '强' : '中等';
+    }
+
+    return { slope, direction, strength };
+  }
+
+  /**
+   * 生成分析建议（增强版）
    */
   static generateAnalysis(klines, indicators) {
     const { macd, signal, histogram } = indicators;
@@ -155,22 +226,31 @@ class Indicators {
 
     // 根据 MACD 判断
     if (histogram > 0) {
-      analysis += 'MACD 柱状图为正，趋势向上。';
+      analysis += 'MACD 柱状图为正，多头动能占优。';
       recommendation = '看多';
     } else if (histogram < 0) {
-      analysis += 'MACD 柱状图为负，趋势向下。';
+      analysis += 'MACD 柱状图为负，空头动能占优。';
       recommendation = '看空';
     } else {
-      analysis += 'MACD 处于十字线附近，方向不明确。';
+      analysis += 'MACD 处于零轴附近，方向不明确。';
+    }
+
+    // MACD 金叉/死叉
+    if (indicators.crossover_type === 'golden_cross') {
+      analysis += ' 出现金叉信号，短线看多。';
+      recommendation = '看多';
+    } else if (indicators.crossover_type === 'dead_cross') {
+      analysis += ' 出现死叉信号，短线看空。';
+      recommendation = '看空';
     }
 
     // 价格与支撑压力位关系
     const { support, resistance } = indicators;
-    if (currentPrice < support * 1.05) {
-      analysis += '股票价格接近支撑位，可能出现反弹。';
+    if (support > 0 && currentPrice < support * 1.05) {
+      analysis += ` 股价 ¥${currentPrice.toFixed(2)} 接近支撑位 ¥${support.toFixed(2)}，关注支撑力度。`;
     }
-    if (currentPrice > resistance * 0.95) {
-      analysis += '股票价格接近压力位，可能面临回调。';
+    if (resistance > 0 && currentPrice > resistance * 0.95) {
+      analysis += ` 股价 ¥${currentPrice.toFixed(2)} 接近压力位 ¥${resistance.toFixed(2)}，注意回调风险。`;
     }
 
     return { analysis, recommendation };

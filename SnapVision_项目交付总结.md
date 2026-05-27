@@ -53,7 +53,7 @@ SnapVision 是一个完整的股票分析平台，类似 TradingView。用户可
 
 ```bash
 cd /Users/mac/Desktop/snapvision
-bash start.sh
+node server.js
 ```
 
 ### 方式二：手动启动
@@ -141,6 +141,7 @@ python3 -m http.server 3000
 - **Multer 1.4.5** - 文件上传处理
 - **CORS 2.8.5** - 跨域资源共享
 - **UUID 9.x** - 唯一标识符生成
+- **OCR 图片识别
 
 ### 部署技术
 
@@ -248,7 +249,7 @@ A: 检查浏览器控制台错误、数据格式是否正确
 
 ```bash
 # 启动应用
-bash start.sh
+PORT=5001 node server.js(inside backend)
 
 # 运行测试
 bash test-integration.sh

@@ -1,151 +1,227 @@
 /**
- * Chart Module
- * Handles Chart.js integration for K-line visualization
+ * Chart Module — Liquid Glass Dark Theme
+ * Apple-inspired K-line visualization with glowing lines & glass containers
  */
 
 let klineChart = null;
+let volumeChart = null;
 
 class ChartManager {
-  /**
-   * Initialize and draw K-line chart
-   */
+
+  static COLOR = {
+    bg:        'transparent',
+    grid:      'rgba(255,255,255,0.06)',
+    text:      'rgba(255,255,255,0.5)',
+    textBright:'rgba(255,255,255,0.8)',
+    close:     '#64D2FF',   // Apple blue-cyan
+    ma5:       '#FFD60A',   // yellow
+    ma10:      '#FF9F0A',   // orange
+    ma20:      '#BF5AF2',   // purple
+    ma60:      '#5E5CE6',   // indigo
+    volUp:     'rgba(255,69,58,0.55)',
+    volDown:   'rgba(48,209,88,0.55)',
+    tooltipBg: 'rgba(28,28,30,0.95)',
+    tooltipBorder:'rgba(255,255,255,0.15)',
+  };
+
   static drawKlineChart(klines) {
-    const ctx = document.getElementById('kline-chart').getContext('2d');
-    
-    // Prepare data for Chart.js
-    const labels = klines.map(k => k.date);
-    const openPrices = klines.map(k => k.open);
-    const closePrices = klines.map(k => k.close);
-    const highPrices = klines.map(k => k.high);
-    const lowPrices = klines.map(k => k.low);
-
-    // Calculate moving averages for trend lines
-    const ma5 = this.calculateMA(closePrices, 5);
-    const ma10 = this.calculateMA(closePrices, 10);
-
-    // Destroy existing chart if it exists
-    if (klineChart) {
-      klineChart.destroy();
+    if (!klines || klines.length === 0) {
+      console.warn('No kline data');
+      return;
     }
 
-    klineChart = new Chart(ctx, {
+    const labels   = klines.map(k => k.date);
+    const closes   = klines.map(k => k.close);
+    const volumes  = klines.map(k => k.volume || 0);
+
+    const ma5  = this.calcMA(closes, 5);
+    const ma10 = this.calcMA(closes, 10);
+    const ma20 = this.calcMA(closes, 20);
+    const ma60 = this.calcMA(closes, 60);
+
+    // Volume bar colors
+    const barColors = klines.map((k, i) => {
+      const prev = i > 0 ? klines[i - 1].close : k.open;
+      return k.close >= prev ? this.COLOR.volUp : this.COLOR.volDown;
+    });
+    const barBorders = barColors.map(c => c.replace('0.55', '0.85'));
+
+    if (klineChart) klineChart.destroy();
+    if (volumeChart) volumeChart.destroy();
+
+    window._lastKlines = klines;
+
+    // ── Price + MA chart ──
+    const ctxP = document.getElementById('kline-chart').getContext('2d');
+    klineChart = new Chart(ctxP, {
       type: 'line',
       data: {
         labels,
         datasets: [
           {
-            label: '收盘价',
-            data: closePrices,
-            borderColor: '#3b82f6',
+            label: I18n.t('chart.close'),
+            data: closes,
+            borderColor: this.COLOR.close,
+            backgroundColor: (ctx) => {
+              const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
+              g.addColorStop(0, 'rgba(100,210,255,0.15)');
+              g.addColorStop(1, 'rgba(100,210,255,0.0)');
+              return g;
+            },
             borderWidth: 2,
-            fill: false,
-            pointRadius: 2,
-            pointBackgroundColor: '#3b82f6',
-            tension: 0.1,
-            yAxisID: 'y'
-          },
-          {
-            label: 'MA5',
-            data: ma5,
-            borderColor: '#f59e0b',
-            borderWidth: 1,
-            borderDash: [5, 5],
-            fill: false,
+            fill: true,
             pointRadius: 0,
-            tension: 0.1,
-            yAxisID: 'y'
+            pointHoverRadius: 5,
+            pointHoverBackgroundColor: this.COLOR.close,
+            pointHoverBorderColor: '#fff',
+            pointHoverBorderWidth: 2,
+            tension: 0.2,
+            yAxisID: 'y',
           },
-          {
-            label: 'MA10',
-            data: ma10,
-            borderColor: '#ef4444',
-            borderWidth: 1,
-            borderDash: [5, 5],
-            fill: false,
-            pointRadius: 0,
-            tension: 0.1,
-            yAxisID: 'y'
-          },
-          {
-            label: '最高价',
-            data: highPrices,
-            borderColor: 'rgba(16, 185, 129, 0.3)',
-            borderWidth: 1,
-            fill: false,
-            pointRadius: 0,
-            yAxisID: 'y'
-          },
-          {
-            label: '最低价',
-            data: lowPrices,
-            borderColor: 'rgba(239, 68, 68, 0.3)',
-            borderWidth: 1,
-            fill: false,
-            pointRadius: 0,
-            yAxisID: 'y'
-          }
+          { label:'MA5',  data:ma5,  borderColor:this.COLOR.ma5,  borderWidth:1.5, borderDash:[],     fill:false, pointRadius:0, tension:0.2, yAxisID:'y' },
+          { label:'MA10', data:ma10, borderColor:this.COLOR.ma10, borderWidth:1.5, borderDash:[3,3],  fill:false, pointRadius:0, tension:0.2, yAxisID:'y' },
+          { label:'MA20', data:ma20, borderColor:this.COLOR.ma20, borderWidth:1.5, borderDash:[5,2],  fill:false, pointRadius:0, tension:0.2, yAxisID:'y' },
+          { label:'MA60', data:ma60, borderColor:this.COLOR.ma60, borderWidth:1.2, borderDash:[8,3],  fill:false, pointRadius:0, tension:0.2, yAxisID:'y' },
         ]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        interaction: {
-          mode: 'index',
-          intersect: false
-        },
+        animation: { duration: 800, easing: 'easeOutQuart' },
+        interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: {
             position: 'top',
+            align: 'end',
             labels: {
+              color: this.COLOR.textBright,
               usePointStyle: true,
-              padding: 15
+              pointStyleWidth: 12,
+              padding: 16,
+              font: { family: systemFont, size: 11, weight: '500' },
+              boxWidth: 16,
+              boxHeight: 1,
             }
           },
-          title: {
-            display: true,
-            text: 'K 线走势图'
+          tooltip: {
+            backgroundColor: this.COLOR.tooltipBg,
+            titleColor: this.COLOR.textBright,
+            bodyColor: this.COLOR.text,
+            borderColor: this.COLOR.tooltipBorder,
+            borderWidth: 1,
+            cornerRadius: 12,
+            padding: 12,
+            titleFont: { family: systemFont, weight: '600', size: 12 },
+            bodyFont: { family: systemFont, size: 11 },
+            callbacks: {
+              label: (ctx) => {
+                const v = ctx.parsed.y;
+                if (v == null) return '';
+                return `${ctx.dataset.label}: ¥${v.toFixed(2)}`;
+              }
+            }
           }
         },
         scales: {
           y: {
             type: 'linear',
             position: 'left',
-            title: {
-              display: true,
-              text: '价格'
-            }
+            grid: { color: this.COLOR.grid },
+            ticks: {
+              color: this.COLOR.text,
+              callback: v => '¥' + (v >= 1000 ? (v/1000).toFixed(2)+'k' : v.toFixed(v<10?2:1)),
+              font: { family: systemFont, size: 10 },
+              maxTicksLimit: 6,
+            },
           },
           x: {
-            title: {
-              display: true,
-              text: '日期'
+            grid: { color: this.COLOR.grid },
+            ticks: {
+              color: this.COLOR.text,
+              maxTicksLimit: 10,
+              autoSkip: true,
+              font: { family: systemFont, size: 10 },
+            },
+          }
+        }
+      }
+    });
+
+    // ── Volume sub-chart ──
+    const ctxV = document.getElementById('volume-chart').getContext('2d');
+    volumeChart = new Chart(ctxV, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: I18n.t('chart.volume'),
+          data: volumes,
+          backgroundColor: barColors,
+          borderColor: barBorders,
+          borderWidth: 0.5,
+          borderRadius: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 600, easing: 'easeOutQuart' },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: this.COLOR.tooltipBg,
+            titleColor: this.COLOR.textBright,
+            bodyColor: this.COLOR.text,
+            borderColor: this.COLOR.tooltipBorder,
+            borderWidth: 1,
+            cornerRadius: 12,
+            padding: 12,
+            callbacks: {
+              label: (ctx) => {
+                const v = ctx.parsed.y;
+                const volLabel = I18n.t('chart.volume');
+                if (v >= 1e8) return `${volLabel}: ${(v/1e8).toFixed(2)}亿手`;
+                if (v >= 1e4) return `${volLabel}: ${(v/1e4).toFixed(1)}万手`;
+                return `${volLabel}: ${v}手`;
+              }
             }
+          }
+        },
+        scales: {
+          y: {
+            grid: { color: this.COLOR.grid },
+            ticks: {
+              color: this.COLOR.text,
+              callback: v => v >= 1e8 ? (v/1e8).toFixed(1)+'亿' : v >= 1e4 ? (v/1e4).toFixed(0)+'万' : v,
+              maxTicksLimit: 4,
+              font: { family: systemFont, size: 9 },
+            },
+          },
+          x: {
+            ticks: { display: false },
+            grid: { display: false },
           }
         }
       }
     });
   }
 
-  /**
-   * Calculate moving average
-   */
-  static calculateMA(data, period) {
-    const result = [];
+  static calcMA(data, period) {
+    const r = [];
     for (let i = 0; i < data.length; i++) {
-      if (i < period - 1) {
-        result.push(null);
-      } else {
-        const sum = data.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0);
-        result.push(sum / period);
-      }
+      if (i < period - 1) { r.push(null); continue; }
+      const s = data.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0);
+      r.push(Math.round(s / period * 100) / 100);
     }
-    return result;
+    return r;
   }
 
-  /**
-   * Format price for display
-   */
-  static formatPrice(price) {
-    return parseFloat(price).toFixed(2);
-  }
+  static formatPrice(p) { return (parseFloat(p) || 0).toFixed(2); }
 }
+
+const systemFont = "-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif";
+
+// Re-draw on language change
+window._onLangChange = () => {
+  if (window._lastKlines) ChartManager.drawKlineChart(window._lastKlines);
+};

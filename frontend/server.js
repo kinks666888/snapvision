@@ -4,8 +4,14 @@ const app = express();
 
 const PORT = process.env.PORT || 3000;
 
-// Serve static files from frontend directory
-app.use(express.static(path.join(__dirname)));
+// Serve static files from frontend directory with no-cache
+app.use(express.static(path.join(__dirname), {
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
 
 // Handle SPA routing - must be last
 app.get('/', (req, res) => {
@@ -20,5 +26,3 @@ app.listen(PORT, () => {
   console.log(`🌐 Frontend server running at http://localhost:${PORT}`);
   console.log(`📖 Open http://localhost:${PORT} in your browser`);
 });
-
-

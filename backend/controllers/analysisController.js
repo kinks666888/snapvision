@@ -1,7 +1,57 @@
+const OCRParser = require('../utils/ocrParser');
+const { execFile } = require('child_process');
+const path = require('path');
+const sharp = require('sharp');
+const { promisify } = require('util');
 const { v4: uuidv4 } = require('uuid');
+
 const AnalysisModel = require('../models/analysis');
 const Indicators = require('../utils/indicators');
 const KlineParser = require('../utils/klineParser');
+const marketService = require('../services/marketService');
+const AIAnalysisService = require('../services/aiAnalysisService');
+const SignalEngine = require('../services/signalEngine');
+
+const execFileAsync = promisify(execFile);
+
+function parseOcrTexts(stdout) {
+  const text = String(stdout || '').trim();
+  if (!text) return [];
+
+  // 1) 尝试直接解析纯 JSON
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return parsed.map(item => String(item).trim()).filter(Boolean);
+    }
+  } catch {
+    // 继续尝试其他方式
+  }
+
+  // 2) OCR 日志可能污染 stdout — 尝试提取 JSON 数组
+  //    匹配最后一个完整的 JSON 数组
+  const arrayMatch = text.match(/\[.*\]/s);
+  if (arrayMatch) {
+    try {
+      const parsed = JSON.parse(arrayMatch[0]);
+      if (Array.isArray(parsed)) {
+        console.log('⚠️ OCR stdout 含有非JSON日志，已自动提取数组');
+        return parsed.map(item => String(item).trim()).filter(Boolean);
+      }
+    } catch {
+      // 提取失败，继续
+    }
+  }
+
+  // 3) 彻底失败
+  console.warn('⚠️ OCR stdout 无法解析:', text.substring(0, 200));
+  return [];
+}
+
+function safeNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
 
 class AnalysisController {
   /**
@@ -10,62 +60,269 @@ class AnalysisController {
    */
   static async analyze(req, res) {
     try {
+      console.log('🔥 analyze API triggered');
+
       if (!req.file) {
         return res.status(400).json({ error: '请上传图片文件' });
       }
 
-      // Extract stock info from filename
-      const stockInfo = KlineParser.extractStockInfo(req.file.originalname);
+      // ── 步骤1: OCR 识别 ──
+      const fileStockInfo = KlineParser.extractStockInfo(req.file.originalname);
+      const imagePath = path.resolve(__dirname, '..', req.file.path);
+      const ocrPath = path.resolve(__dirname, '..', 'ocr.py');
 
-      // Generate mock analysis data
-      const mockData = KlineParser.generateMockAnalysis(
-        stockInfo.code,
-        stockInfo.name
-      );
+      // 压缩图片，降低 OCR 内存占用
+      const compressedPath = `${imagePath}_small.jpg`;
+      await sharp(imagePath)
+        .resize(1280, 1280, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 80 })
+        .toFile(compressedPath);
 
-      // Calculate technical indicators
-      const macdData = Indicators.macd(mockData.klines.map(k => k.close));
-      const crossover = Indicators.getCrossover(macdData);
-      const supportResistance = Indicators.getSupportResistance(mockData.klines);
-      const analysisText = Indicators.generateAnalysis(
-        mockData.klines,
+      const pythonBin = process.env.PYTHON_BIN || 'python3';
+
+      const { stdout, stderr } = await execFileAsync(
+        pythonBin,
+        [ocrPath, compressedPath],
         {
-          macd: macdData.macd,
-          signal: macdData.signal,
-          histogram: macdData.histogram,
-          ...supportResistance
+          maxBuffer: 10 * 1024 * 1024,
+          env: {
+            ...process.env,
+            PYTHONUNBUFFERED: '1'
+          }
         }
       );
 
-      // Create analysis object
-      const analysis = {
-        id: uuidv4(),
-        stock_code: mockData.stock_code,
-        stock_name: mockData.stock_name,
-        price: mockData.price,
-        change_percent: mockData.change_percent,
+      if (stderr && process.env.NODE_ENV === 'development') {
+        console.error('OCR stderr:', stderr);
+      }
+
+      const ocrTexts = parseOcrTexts(stdout);
+      console.log('📷 OCR Result:', ocrTexts);
+
+      const parsedData = OCRParser.parse(ocrTexts);
+      console.log('📋 Parsed Data:', JSON.stringify(parsedData));
+
+      // ── 步骤2: 确定股票代码 ──
+      const stockName = parsedData.stock_name !== '未知股票'
+        ? parsedData.stock_name
+        : (fileStockInfo.name || '未知股票');
+
+      const stockCode = parsedData.stock_code !== '000000'
+        ? parsedData.stock_code
+        : (fileStockInfo.code || '000000');
+
+      console.log(`🎯 Initial stock: ${stockName} (${stockCode})`);
+
+      // ── 步骤3: 获取真实行情数据 ──
+      let klines = [];
+      let quote = null;
+      let marketFetchError = null;
+
+      try {
+        console.log(`📡 正在获取真实行情: ${stockCode}...`);
+
+        // 并行获取 K 线和实时行情
+        const [klineResult, quoteResult] = await Promise.allSettled([
+          marketService.getKlineData(stockCode, 60),
+          marketService.getRealtimeQuote(stockCode),
+        ]);
+
+        if (klineResult.status === 'fulfilled') {
+          klines = klineResult.value || [];
+          console.log(`✅ K线获取成功: ${klines.length} 条`);
+        } else {
+          marketFetchError = klineResult.reason?.message || 'K线获取失败';
+          console.warn(`⚠️ K线获取失败: ${marketFetchError}`);
+        }
+
+        if (quoteResult.status === 'fulfilled') {
+          quote = quoteResult.value;
+          console.log(`✅ 实时行情: ${quote.name} ¥${quote.price} ${quote.change_pct > 0 ? '+' : ''}${quote.change_pct}%`);
+        } else {
+          console.warn(`⚠️ 行情获取失败: ${quoteResult.reason?.message}`);
+        }
+      } catch (err) {
+        marketFetchError = err.message;
+        console.warn(`⚠️ 行情服务异常: ${err.message}`);
+      }
+
+      // ── 步骤4: 技术指标计算（基于真实数据） ──
+      const closePrices = klines.length > 0
+        ? klines.map(k => safeNumber(k.close)).filter(v => v > 0)
+        : [];
+
+      const volumes = klines.length > 0
+        ? klines.map(k => safeNumber(k.volume))
+        : [];
+
+      // 真实 MACD
+      const macdData = closePrices.length >= 26
+        ? Indicators.macd(closePrices)
+        : { macd: 0, signal: 0, histogram: 0, macdLine: [], signalLine: [], histogramArray: [] };
+
+      const crossover = Indicators.getCrossover(macdData);
+
+      // 支撑压力位
+      const supportResistance = klines.length >= 5
+        ? Indicators.getSupportResistance(klines)
+        : { support: 0, resistance: 0 };
+
+      // 多周期 MA
+      const mas = closePrices.length >= 60
+        ? Indicators.calculateAllMA(closePrices)
+        : { ma5: 0, ma10: 0, ma20: 0, ma60: 0 };
+
+      // 价格趋势
+      const trend = closePrices.length >= 10
+        ? Indicators.priceTrend(closePrices.slice(-20))
+        : { direction: '横盘', strength: '弱' };
+
+      // 均量
+      const avgVol = volumes.length >= 10
+        ? Indicators.avgVolume(volumes)
+        : 0;
+
+      console.log(`📊 指标计算完成 — MACD:${macdData.macd.toFixed(3)} 趋势:${trend.direction}/${trend.strength}`);
+
+      // ── 步骤5: 名称与价格修正 ──
+      // 行情 API 返回的名称最可靠，覆盖 OCR/文件名
+      let finalStockName = stockName;
+      if (quote && quote.name && quote.name !== '未知' && !/^\d{6}$/.test(quote.name)) {
+        finalStockName = quote.name;
+        console.log(`🔧 名称已从行情API修正: "${stockName}" → "${finalStockName}"`);
+      }
+      console.log(`🎯 Final stock: ${finalStockName} (${stockCode})`);
+
+      // 优先级: 实时行情 > OCR 识别 > 0
+      const price = quote && quote.price > 0
+        ? quote.price
+        : (parsedData.current_price || 0);
+
+      const changePercent = quote
+        ? safeNumber(quote.change_pct)
+        : safeNumber(parsedData.change_percent);
+
+      const changeAmount = quote
+        ? safeNumber(quote.change)
+        : safeNumber(parsedData.change);
+
+      // MACD 字段映射: OCR 值作为参考，真实计算值优先
+      const macdLine   = macdData.macd !== 0   ? macdData.macd   : safeNumber(parsedData.dif);
+      const signalLine = macdData.signal !== 0 ? macdData.signal : safeNumber(parsedData.dea);
+      const histogram  = macdData.histogram !== 0 ? macdData.histogram : safeNumber(parsedData.macd);
+
+      // ── 步骤6: AI 分析报告 ──
+      const aiReport = AIAnalysisService.generateReport({
+        stockInfo: {
+          code: stockCode,
+          name: finalStockName,
+          marketName: marketService.resolveMarket(stockCode).marketName,
+        },
+        quote: quote || {
+          price, change: changeAmount, change_pct: changePercent,
+          volume: klines.length > 0 ? klines[klines.length - 1].volume : 0,
+          amount: 0, turnover: 0, preclose: 0,
+        },
+        klines,
+        indicators: {
+          macd: macdLine,
+          signal: signalLine,
+          histogram,
+          support: supportResistance.support,
+          resistance: supportResistance.resistance,
+          crossover: crossover.crossover,
+          crossover_type: crossover.type,
+        },
+        mas,
+        ocrPrice: parsedData.current_price || 0,
+      });
+
+      console.log(`🤖 AI分析: ${aiReport.recommendation}`);
+
+      // ── 步骤6.5: AI 信号引擎 ──
+      const signal = SignalEngine.generate({
+        price,
+        change_pct: changePercent,
+        mas,
+        macd: macdLine,
+        signal: signalLine,
+        histogram,
+        crossover_type: crossover.type,
         support: supportResistance.support,
         resistance: supportResistance.resistance,
-        macd: macdData.macd,
-        signal: macdData.signal,
-        macd_histogram: macdData.histogram,
-        crossover: crossover.crossover,
-        crossover_type: crossover.type,
-        analysis: analysisText.analysis,
-        recommendation: analysisText.recommendation,
+        trend_dir: trend.direction,
+        trend_strength: trend.strength,
+        klines,
+        latest_volume: klines.length > 0 ? (klines[klines.length - 1].volume || 0) : 0,
+        avg_volume: avgVol,
+      });
+      console.log(`📡 信号引擎: ${signal.trend} | 强度:${signal.signal_strength} | 风险:${signal.risk_level}`);
+
+      // ── 步骤7: 指标分析摘要 ──
+      const indicatorSummary = closePrices.length > 0
+        ? Indicators.generateAnalysis(klines, {
+            macd: macdLine,
+            signal: signalLine,
+            histogram,
+            support: supportResistance.support,
+            resistance: supportResistance.resistance,
+            crossover_type: crossover.type,
+          })
+        : { analysis: '', recommendation: '中性' };
+
+      // ── 步骤8: 组装响应 ──
+      const analysis = {
+        id: uuidv4(),
+        stock_code: stockCode,
+        stock_name: finalStockName,
+        price: safeNumber(price),
+        change: safeNumber(changeAmount),
+        change_percent: safeNumber(changePercent),
+        support: safeNumber(supportResistance.support),
+        resistance: safeNumber(supportResistance.resistance),
+        macd: safeNumber(macdLine),
+        signal: safeNumber(signalLine),
+        macd_histogram: safeNumber(histogram),
+        crossover: crossover.crossover || '无',
+        crossover_type: crossover.type || 'none',
+        // 优先使用 AI 分析，回退到指标摘要
+        analysis: aiReport.analysis || indicatorSummary.analysis || '分析完成',
+        recommendation: aiReport.recommendation || indicatorSummary.recommendation || '中性',
+        risk: aiReport.risk || '中等',
+        key_points: aiReport.keyPoints || [],
+        // ── AI 信号引擎 ──
+        signal_trend: signal.trend,
+        signal_strength: signal.signal_strength,
+        signal_risk: signal.risk_level,
+        signals: signal.signals || [],
+        signal_summary: signal.summary || '',
+        signal_factors: signal.factors || {},
+        // 附加信息
+        market_name: marketService.resolveMarket(stockCode).marketName,
+        trend_direction: trend.direction,
+        trend_strength: trend.strength,
+        avg_volume: avgVol,
+        data_source: klines.length > 0 ? '东方财富实时行情' : '行情获取失败',
+        data_updated_at: quote?.updated_at || new Date().toISOString(),
         image_path: `/uploads/${req.file.filename}`,
-        kline_data: mockData.klines
+        kline_data: klines,
+        // 保留 OCR 原始数据用于调试
+        _ocr_texts: ocrTexts,
+        _parsed_data: parsedData,
       };
 
-      // Save to database
       await AnalysisModel.save(analysis);
 
-      // Return response (exclude internal fields)
-      const { kline_data, ...responseData } = analysis;
+      const { kline_data, _ocr_texts, _parsed_data, ...responseData } = analysis;
+
       res.json({
         ...responseData,
         kline: kline_data,
-        message: '分析完成'
+        ocr_texts: ocrTexts,
+        parsed_data: parsedData,
+        message: marketFetchError
+          ? `分析完成（行情获取失败：${marketFetchError}，部分数据可能不准确）`
+          : '分析完成',
       });
     } catch (error) {
       console.error('Analysis error:', error);
