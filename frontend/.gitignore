@@ -1,5 +1,7 @@
 node_modules
 .env
-*.log
-dist
 uploads
+*.db
+dist
+.cache
+.DS_Store
