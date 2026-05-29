@@ -1,4 +1,4 @@
-# SnapVision Beta
+# SnapVision Beta v0.2
 
 AI-powered stock chart analysis tool  
 AI 股票截图分析工具
