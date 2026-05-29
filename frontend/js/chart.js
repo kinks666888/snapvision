@@ -13,11 +13,11 @@ class ChartManager {
     grid:      'rgba(255,255,255,0.06)',
     text:      'rgba(255,255,255,0.5)',
     textBright:'rgba(255,255,255,0.8)',
-    close:     '#64D2FF',   // Apple blue-cyan
-    ma5:       '#FFD60A',   // yellow
-    ma10:      '#FF9F0A',   // orange
-    ma20:      '#BF5AF2',   // purple
-    ma60:      '#5E5CE6',   // indigo
+    close:     '#f59e0b',   // amber
+    ma5:       '#fbbf24',   // light amber
+    ma10:      '#f97316',   // orange
+    ma20:      '#a78bfa',   // violet
+    ma60:      '#60a5fa',   // blue
     volUp:     'rgba(255,69,58,0.55)',
     volDown:   'rgba(48,209,88,0.55)',
     tooltipBg: 'rgba(28,28,30,0.95)',
@@ -116,7 +116,7 @@ class ChartManager {
             callbacks: {
               label: (ctx) => {
                 const v = ctx.parsed.y;
-                if (v == null) return '';
+                if (v == null || !Number.isFinite(v)) return '';
                 return `${ctx.dataset.label}: ¥${v.toFixed(2)}`;
               }
             }
@@ -179,6 +179,7 @@ class ChartManager {
             callbacks: {
               label: (ctx) => {
                 const v = ctx.parsed.y;
+                if (v == null || !Number.isFinite(v)) return '';
                 const volLabel = I18n.t('chart.volume');
                 if (v >= 1e8) return `${volLabel}: ${(v/1e8).toFixed(2)}亿手`;
                 if (v >= 1e4) return `${volLabel}: ${(v/1e4).toFixed(1)}万手`;
@@ -219,7 +220,7 @@ class ChartManager {
   static formatPrice(p) { return (parseFloat(p) || 0).toFixed(2); }
 }
 
-const systemFont = "-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif";
+const systemFont = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'Helvetica Neue', sans-serif";
 
 // Re-draw on language change
 window._onLangChange = () => {

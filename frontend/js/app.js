@@ -1,369 +1,199 @@
 /**
- * SnapVision App — Liquid Glass Edition
- * Apple-style interactions, spring animations, AI terminal effects
+ * SnapVision — Smooth Scroll Transition Engine
  */
 
 let currentAnalysis = null;
-let currentHistoryPage = 0;
-const HISTORY_LIMIT = 10;
+let lenis = null;
+let isTransitioning = false;
+const totalSections = 3;
+const PAGE_SIZE = 10;
 
-// ── DOM ──
-const uploadZone    = document.getElementById('upload-zone');
-const fileInput     = document.getElementById('file-input');
-const fileInfo      = document.getElementById('file-info');
-const fileName      = document.getElementById('file-name');
-const resultSection = document.getElementById('result-section');
-const loadingState  = document.getElementById('loading-state');
-const errorState    = document.getElementById('error-state');
-const errorMessage  = document.getElementById('error-message');
-const historySection = document.getElementById('history-section');
-const uploadSection  = document.getElementById('upload-section');
-const scanLine      = document.querySelector('.scan-line');
+const DUR = 0.8;
+const EASE = 'power3.out';
 
 // ── Init ──
 document.addEventListener('DOMContentLoaded', () => {
-  setupUploadZone();
+  initLenis();
+  setupUpload();
   setupGlobalErrorHandler();
-  loadHistory();
 });
 
 function setupGlobalErrorHandler() {
-  window.addEventListener('error', (e) => console.error('Global error:', e.error));
-  window.addEventListener('unhandledrejection', (e) => console.error('Promise:', e.reason));
+  window.addEventListener('error', e => console.error(e.error));
+  window.addEventListener('unhandledrejection', e => console.error(e.reason));
 }
 
-// ── Utilities ──
-function toNumber(value, fallback = 0) {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
-  if (typeof value === 'string') {
-    const cleaned = value.replace(/[￥,\s]/g, '').replace(/%/g, '').replace(/[^\d.-]/g, '');
-    const n = Number(cleaned);
-    return Number.isFinite(n) ? n : fallback;
+// ═══════════════════════════════════════
+// LENIS — smooth scroll + GSAP ticker
+// ═══════════════════════════════════════
+function initLenis() {
+  if (typeof Lenis === 'undefined') return;
+  lenis = new Lenis({
+    duration: 1.2,
+    easing: t => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+    smoothWheel: true,
+    wheelMultiplier: 0.8,
+    touchMultiplier: 1.5,
+    infinite: false,
+    wrapper: document.getElementById('scroll-container'),
+  });
+  if (window.gsap && gsap.ticker) {
+    gsap.ticker.add(time => lenis.raf(time * 1000));
+  } else {
+    function raf(time) { lenis.raf(time); requestAnimationFrame(raf); }
+    requestAnimationFrame(raf);
   }
-  return fallback;
 }
-function formatPrice(value, digits = 2) { return (toNumber(value, 0) || 0).toFixed(digits); }
-function formatPercent(value, digits = 2) { const n = toNumber(value, 0) || 0; return `${n > 0 ? '+' : ''}${n.toFixed(digits)}%`; }
 
-// ── Upload Zone — Liquid Glass scan effect ──
-function setupUploadZone() {
-  uploadZone.addEventListener('click', () => fileInput.click());
+// ═══════════════════════════════════════
+// SCROLL TO SECTION — GSAP smooth scroll
+// ═══════════════════════════════════════
+function scrollToSection(index) {
+  if (isTransitioning) return;
+  const sections = document.querySelectorAll('.section');
+  if (index < 0 || index >= sections.length) return;
+  isTransitioning = true;
 
-  uploadZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    uploadZone.classList.add('drag-active');
-  });
-  uploadZone.addEventListener('dragleave', () => {
-    uploadZone.classList.remove('drag-active');
-  });
-  uploadZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    uploadZone.classList.remove('drag-active');
-    if (e.dataTransfer.files.length > 0) handleFileSelect(e.dataTransfer.files[0]);
-  });
-  fileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) handleFileSelect(e.target.files[0]);
+  const target = sections[index];
+  const top = target.offsetTop;
+
+  // GSAP 平滑滚动到目标 section
+  gsap.to(document.getElementById('scroll-container'), {
+    scrollTop: top,
+    duration: DUR,
+    ease: EASE,
+    onComplete: () => { isTransitioning = false; }
   });
 }
 
-async function handleFileSelect(file) {
+// ═══════════════════════════════════════
+// UPLOAD
+// ═══════════════════════════════════════
+function setupUpload() {
+  const zone = document.getElementById('upload-zone');
+  const input = document.getElementById('file-input');
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-active'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-active'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag-active');
+    if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+  });
+  input.addEventListener('change', e => { if (e.target.files.length > 0) handleFile(e.target.files[0]); });
+}
+
+async function handleFile(file) {
+  if (!file.type.startsWith('image/')) { alert('请选择图片文件'); return; }
+  if (file.size > 10485760) { alert('文件大小不能超过10MB'); return; }
+  const fnEl=$('file-name'), fiEl=$('file-info'), ldEl=$('loading-indicator'), uzEl=$('upload-zone');
+  if (fnEl) fnEl.textContent = file.name;
+  if (fiEl) fiEl.classList.add('show');
+  if (ldEl) ldEl.style.display = 'block';
+  if (uzEl) uzEl.style.pointerEvents = 'none';
   try {
-    if (!file.type.startsWith('image/')) throw new Error(I18n.t('error.file_type'));
-    if (file.size > 10485760) throw new Error(I18n.t('error.file_size'));
-
-    fileName.textContent = file.name;
-    fileInfo.classList.remove('hidden');
-
-    // Start scan animation
-    uploadZone.classList.add('scanning');
-    showLoading();
-
     const analysis = await APIClient.analyzeImage(file);
     currentAnalysis = analysis;
-
-    uploadZone.classList.remove('scanning');
-    displayAnalysisResults(analysis);
-    showResults();
-  } catch (error) {
-    console.error('File error:', error);
-    uploadZone.classList.remove('scanning');
-    showError(error.message || I18n.t('error.unknown'));
+    displayAnalysis(analysis);
+    displayScore(analysis);
+    displaySector(analysis);
+    displayStrategy(analysis);
+    if (ldEl) ldEl.style.display = 'none';
+    if (uzEl) uzEl.style.pointerEvents = 'auto';
+    scrollToSection(1);
+  } catch (err) {
+    if (ldEl) ldEl.style.display = 'none';
+    if (uzEl) uzEl.style.pointerEvents = 'auto';
+    alert('分析失败: ' + (err.message || '请重试'));
   }
 }
 
-// ── Display Results ──
-function displayAnalysisResults(analysis) {
-  const stockName = analysis?.stock_name ?? '未知股票';
-  const stockCode = analysis?.stock_code ?? '--';
-  const price = analysis?.price ?? 0;
-  const changePct = toNumber(analysis?.change_percent, 0);
-  const changeAmt = toNumber(analysis?.change, 0);
+// ═══════════════════════════════════════
+// DISPLAY
+// ═══════════════════════════════════════
+function $(id) { return document.getElementById(id); }
 
-  // ── Stock Header ──
-  document.getElementById('stock-name').textContent = stockName;
-  document.getElementById('stock-code').textContent = stockCode;
-  document.getElementById('current-price').textContent = `¥${formatPrice(price)}`;
-
-  const changeEl = document.getElementById('change-percent');
-  const isUp = changePct > 0, isDown = changePct < 0;
-  changeEl.innerHTML = `
-    <span>${isUp ? '▲' : isDown ? '▼' : '—'} ${formatPercent(changePct)}</span>
-    <span style="font-size:14px;opacity:0.7">${changeAmt !== 0 ? (changeAmt > 0 ? '+' : '') + changeAmt.toFixed(2) : ''}</span>
-  `;
-  changeEl.className = `stock-change ${isUp ? 'up' : isDown ? 'down' : ''}`;
-
-  // ── Indicators ──
-  const support = analysis?.support ?? 0;
-  const resistance = analysis?.resistance ?? 0;
-  document.getElementById('support-value').textContent = `¥${formatPrice(support)}`;
-  document.getElementById('resistance-value').textContent = `¥${formatPrice(resistance)}`;
-  // Distance indicators
-  if (price > 0 && support > 0) {
-    const dist = ((price - support) / support * 100).toFixed(1);
-    document.getElementById('support-dist').textContent = dist > 0 ? `${dist}% ↑` : `${Math.abs(dist)}% ↓`;
+function displayScore(a) {
+  const strength = a.signal_strength || 50;
+  // Score ring animation
+  const arc = document.getElementById('score-arc');
+  if (arc) {
+    const circumference = 377;
+    const offset = circumference - (strength / 100) * circumference;
+    arc.setAttribute('stroke-dashoffset', offset);
+    const color = strength >= 70 ? '#51cf66' : strength >= 55 ? '#f59e0b' : strength >= 40 ? '#8e8e93' : '#ff6b6b';
+    arc.setAttribute('stroke', color);
   }
-  if (price > 0 && resistance > 0) {
-    const dist = ((resistance - price) / price * 100).toFixed(1);
-    document.getElementById('resistance-dist').textContent = dist > 0 ? `${dist}% ↑` : `${Math.abs(dist)}% ↓`;
-  }
-
-  const macd = analysis?.macd ?? 0;
-  const signal = analysis?.signal ?? 0;
-  const histogram = analysis?.macd_histogram ?? 0;
-  document.getElementById('macd-value').textContent = Number(macd).toFixed(3);
-  document.getElementById('signal-value').textContent = Number(signal).toFixed(3);
-  document.getElementById('histogram-value').textContent = Number(histogram).toFixed(3);
-  // MACD color coding
-  document.getElementById('macd-value').className = 'indicator-value ' + (macd > 0 ? 'text-positive' : 'text-negative');
-  document.getElementById('histogram-value').className = 'indicator-value ' + (histogram > 0 ? 'text-positive' : 'text-negative');
-
-  // ── Crossover Badge ──
-  const xBadge = document.getElementById('crossover-badge');
-  const xType = analysis?.crossover_type;
-  xBadge.textContent = I18n.t(I18n.mapCrossover(analysis?.crossover));
-  xBadge.className = 'badge ' + (xType === 'golden_cross' ? 'badge-golden' : xType === 'dead_cross' ? 'badge-dead' : 'badge-neutral');
-
-  // ── Recommendation ──
-  const recBadge = document.getElementById('recommendation-badge');
-  const rec = analysis?.recommendation ?? '';
-  recBadge.textContent = rec ? I18n.t(I18n.mapRecommendation(rec)) : '—';
-  if (rec) {
-    const recKey = I18n.mapRecommendation(rec);
-    if (recKey === 'rec.bull' || recKey === 'rec.hold' || recKey === 'rec.add') recBadge.className = 'badge badge-bull';
-    else if (recKey === 'rec.bear' || recKey === 'rec.reduce' || recKey === 'rec.wait') recBadge.className = 'badge badge-bear';
-    else recBadge.className = 'badge badge-neutral';
-  }
-
-  // ── Trend & Risk ──
-  const trendDir = analysis?.trend_direction ?? '';
-  document.getElementById('trend-direction').textContent = trendDir ? I18n.t(I18n.mapTrend(trendDir)) : '—';
-  const risk = analysis?.risk ?? '';
-  const riskEl = document.getElementById('risk-level');
-  riskEl.textContent = risk ? I18n.t(I18n.mapRisk(risk)) : '—';
-  const riskKey = I18n.mapRisk(risk);
-  riskEl.className = 'risk-value ' + (riskKey === 'risk.high' ? 'risk-high' : riskKey === 'risk.mid' || riskKey === 'risk.mid_high' ? 'risk-mid' : 'risk-low');
-
-  // ── Market Info ──
-  const mktName = analysis?.market_name ?? '';
-  document.getElementById('market-tag').textContent = mktName ? I18n.t(I18n.mapMarket(mktName)) : '';
-  document.getElementById('data-source-tag').textContent = analysis?.data_source ?? '';
-  if (analysis?.data_updated_at) {
-    document.getElementById('data-time').textContent = new Date(analysis.data_updated_at).toLocaleString('zh-CN');
-  }
-
-  // ── AI Signal Engine ──
-  displaySignalCard(analysis);
-
-  // ── AI Analysis ──
-  const aiText = analysis?.analysis ?? '暂无分析结果';
-  document.getElementById('analysis-text').innerHTML = aiText
-    .replace(/\n/g, '<br>')
-    .replace(/【(.+?)】/g, '<strong class="section-tag">$1</strong>');
-
-  // Key points
-  const kp = document.getElementById('key-points');
-  const points = Array.isArray(analysis?.key_points) ? analysis.key_points : [];
-  kp.innerHTML = points.length ? points.map(p => `<span class="kp-tag">✦ ${p}</span>`).join('') : '';
-
-  // ── Draw Chart ──
-  const kline = Array.isArray(analysis?.kline) ? analysis.kline : [];
-  ChartManager.drawKlineChart(kline);
+  const num = document.getElementById('score-num');
+  if (num) { num.textContent = strength; num.style.color = strength >= 55 ? '#51cf66' : strength >= 40 ? '#f59e0b' : '#ff6b6b'; }
+  setText('score-trend', a.signal_trend || '--');
+  setText('score-risk', a.signal_risk || a.risk || '--');
 }
 
-// ── Signal Engine Card ──
-function displaySignalCard(analysis) {
-  const strength = analysis?.signal_strength ?? 50;
-  const trend = analysis?.signal_trend ?? 'neutral';
-  const risk = analysis?.signal_risk ?? 'medium';
-  const signals = Array.isArray(analysis?.signals) ? analysis.signals : [];
-  const summary = analysis?.signal_summary ?? '';
-  const factors = analysis?.signal_factors ?? {};
-
-  // Strength ring
-  const arc = document.getElementById('signal-arc');
-  const circumference = 188.5;
-  const offset = circumference - (strength / 100) * circumference;
-  arc.setAttribute('stroke-dashoffset', offset);
-
-  // Color the arc by strength
-  if (strength >= 70) arc.setAttribute('stroke', '#32d74b');
-  else if (strength >= 55) arc.setAttribute('stroke', '#ff9f0a');
-  else if (strength >= 40) arc.setAttribute('stroke', '#8e8e93');
-  else arc.setAttribute('stroke', '#ff3b6f');
-
-  document.getElementById('signal-num').textContent = strength;
-
-  // Trend badge
-  const trendBadge = document.getElementById('signal-trend-badge');
-  const trendLabels = { bullish:'▲ BULL', mildly_bullish:'↗ BIASED UP', neutral:'— HOLD',
-    mildly_bearish:'↘ BIASED DOWN', bearish:'▼ BEAR' };
-  trendBadge.textContent = trendLabels[trend] || trend;
-  trendBadge.className = 'signal-badge ' + (trend.includes('bull') ? 'bullish' : trend.includes('bear') ? 'bearish' : 'neutral');
-
-  // Signal tags
-  const tagsEl = document.getElementById('signal-tags');
-  if (signals.length > 0) {
-    tagsEl.innerHTML = signals.slice(0, 6).map(s => {
-      const isBull = /多头|上涨|突破|金叉|放量|超卖|转正|转强|底背离|站上/.test(s);
-      const isBear = /空头|下跌|跌破|死叉|缩量.*不足|超买|转弱|顶背离/.test(s);
-      const cls = isBull ? 'bull' : isBear ? 'bear' : '';
-      return `<span class="signal-tag ${cls}">${s}</span>`;
-    }).join('');
-  } else {
-    tagsEl.innerHTML = '<span style="color:var(--text-tertiary);font-size:12px">无活跃信号</span>';
+function displayAnalysis(a) {
+  setText('stock-name', a.stock_name);
+  setText('stock-code', a.stock_code);
+  setText('current-price', '¥' + (a.price || 0).toFixed(2));
+  const pct = a.change_percent || 0;
+  const ce = $('change-percent'); if (ce) {
+    ce.innerHTML = (pct > 0 ? '▲' : pct < 0 ? '▼' : '—') + ' ' + (pct > 0 ? '+' : '') + pct.toFixed(2) + '%';
+    ce.className = 'stock-change ' + (pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat');
   }
+  setText('trend-direction', a.signal_trend);
+  setText('signal-strength', (a.signal_strength || 0) + '/100');
+  setText('risk-level', a.signal_risk || a.risk);
+  setText('macd-value', (a.macd || 0).toFixed(3));
+  setText('support-value', '¥' + (a.support || 0).toFixed(2));
+  setText('resistance-value', '¥' + (a.resistance || 0).toFixed(2));
+  const at = $('analysis-text'); if (at) at.innerHTML = (a.analysis||'').replace(/\n/g,'<br>').replace(/【(.+?)】/g,'<strong>$1</strong>');
+  const kline = a.kline || a.kline_data || [];
+  if (typeof ChartManager !== 'undefined') ChartManager.drawKlineChart(kline);
+}
 
-  // Summary
-  document.getElementById('signal-summary').textContent = summary;
-
-  // Factor bars
-  const factorEl = document.getElementById('signal-factors');
-  if (Object.keys(factors).length > 0) {
-    factorEl.innerHTML = Object.entries(factors).map(([key, f]) => {
-      const pct = f.score || 50;
-      const color = pct >= 70 ? '#32d74b' : pct >= 55 ? '#ff9f0a' : pct >= 40 ? '#8e8e93' : '#ff3b6f';
-      return `<div class="factor-bar">
-        <span class="factor-label">${f.label || key}</span>
-        <div class="factor-track"><div class="factor-fill" style="width:${pct}%;background:${color}"></div></div>
-        <span style="font-size:10px;color:var(--text-tertiary);width:24px">${pct}</span>
-      </div>`;
+function displaySector(a) {
+  const sector = a.sector || {};
+  setText('sector-name', sector.name);
+  setText('sector-heat', sector.heat);
+  const sc = $('sector-concepts'); if (sc) sc.innerHTML = (sector.concepts||[]).map(c=>`<span class="tag">${c}</span>`).join('');
+  const cards = $('sector-cards'); if (cards) {
+    cards.innerHTML = (a.related_stocks||[]).map(s => {
+      const p = s.change_percent || 0;
+      return `<div class="glass sector-card"><div class="sector-card-name">${s.name||'--'}</div><div class="sector-card-price">¥${(s.price||0).toFixed(2)}</div><div class="sector-card-change ${p>0?'up':p<0?'down':''}">${p>0?'+':''}${p.toFixed(2)}%</div><div class="sector-card-tag">${s.tag||''}</div></div>`;
     }).join('');
   }
 }
 
-// ── State Transitions ──
-function showResults() {
-  loadingState.classList.add('hidden');
-  errorState.classList.add('hidden');
-  resultSection.classList.remove('hidden');
-  // Staggered card reveal
-  requestAnimationFrame(() => {
-    resultSection.classList.add('visible');
-    document.querySelectorAll('.glass-card').forEach((c, i) => {
-      c.style.animationDelay = `${i * 0.06}s`;
-      c.classList.add('card-enter');
-    });
-  });
+function displayStrategy(a) {
+  setText('strategy-bias', a.strategy_bias);
+  setText('strategy-position', a.strategy_position);
+  setText('strategy-confidence', (a.strategy_confidence || 0) + '%');
+  setText('strategy-stop', '¥' + (a.strategy_stop_loss || 0).toFixed(2));
+  setText('strategy-take', '¥' + (a.strategy_take_profit || 0).toFixed(2));
 }
 
-function showLoading() {
-  resultSection.classList.add('hidden');
-  resultSection.classList.remove('visible');
-  errorState.classList.add('hidden');
-  loadingState.classList.remove('hidden');
-  // Reset card animations
-  document.querySelectorAll('.glass-card').forEach(c => c.classList.remove('card-enter'));
+function setText(id, val) {
+  const el = $(id);
+  if (el) el.textContent = val || '--';
 }
 
-function showError(message) {
-  errorMessage.textContent = message;
-  loadingState.classList.add('hidden');
-  resultSection.classList.add('hidden');
-  resultSection.classList.remove('visible');
-  errorState.classList.remove('hidden');
+// ═══════════════════════════════════════
+// HISTORY DRAWER
+// ═══════════════════════════════════════
+function openDrawer(){document.getElementById('drawer-overlay').classList.add('open');document.getElementById('drawer').classList.add('open');loadDrawerHistory(0)}
+function closeDrawer(){document.getElementById('drawer-overlay').classList.remove('open');document.getElementById('drawer').classList.remove('open')}
+async function loadDrawerHistory(page=0){
+  try{
+    const r=await APIClient.getHistory(PAGE_SIZE,page*PAGE_SIZE);
+    const list=document.getElementById('drawer-list');
+    if(!r.data||!r.data.length){list.innerHTML='<p style="color:var(--t3);text-align:center;padding:32px">暂无</p>';document.getElementById('drawer-pagination').innerHTML='';return}
+    list.innerHTML=r.data.map(i=>{const p=i.change_percent||0;return`<div class="drawer-item" onclick="viewDrawerDetail('${i.id}')"><div class="drawer-item-name">${i.stock_name||'未知'} <span style="color:var(--t3);font-size:12px">${i.stock_code||''}</span></div><div class="drawer-item-meta"><span>¥${(i.price||0).toFixed(2)}</span><span style="color:${p>0?'var(--up)':p<0?'var(--down)':'var(--t3)'}">${p>0?'+':''}${p.toFixed(2)}%</span></div></div>`}).join('');
+    const tp=Math.ceil((r.pagination?.total||0)/PAGE_SIZE);
+    document.getElementById('drawer-pagination').innerHTML=tp>1?Array.from({length:tp},(_,i)=>`<button class="${i===page?'active':''}" onclick="loadDrawerHistory(${i})">${i+1}</button>`).join(''):'';
+  }catch(e){document.getElementById('drawer-list').innerHTML='<p style="color:var(--up);text-align:center;padding:32px">加载失败</p>'}
 }
-
-function resetUpload() {
-  fileInput.value = '';
-  fileInfo.classList.add('hidden');
-  resultSection.classList.add('hidden');
-  resultSection.classList.remove('visible');
-  loadingState.classList.add('hidden');
-  errorState.classList.add('hidden');
-  uploadZone.classList.remove('scanning');
-  currentAnalysis = null;
-}
-
-// ── History ──
-async function loadHistory(page = 0) {
-  try {
-    const offset = page * HISTORY_LIMIT;
-    const result = await APIClient.getHistory(HISTORY_LIMIT, offset);
-    const list = document.getElementById('history-list');
-
-    if (!result.data.length) {
-      list.innerHTML = `<p style="color:var(--text-secondary);text-align:center;padding:48px 0">${I18n.t('history.empty')}</p>`;
-      document.getElementById('pagination').innerHTML = '';
-      return;
-    }
-
-    list.innerHTML = result.data.map(item => {
-      const chg = toNumber(item.change_percent, 0);
-      return `
-      <div class="history-item glass-card" onclick="viewHistoryDetail('${item.id}')">
-        <div class="history-left">
-          <div class="history-name">${item.stock_name ?? '未知'}</div>
-          <div class="history-code">${item.stock_code ?? '--'} · ${item.market_name ?? ''}</div>
-        </div>
-        <div class="history-right">
-          <div class="history-price">¥${formatPrice(item.price)}</div>
-          <div class="history-change ${chg > 0 ? 'up' : chg < 0 ? 'down' : ''}">${formatPercent(chg)}</div>
-          <div class="history-date">${item.created_at ? new Date(item.created_at).toLocaleDateString('zh-CN') : ''}</div>
-        </div>
-      </div>`;
-    }).join('');
-
-    const totalPages = Math.ceil(result.pagination.total / HISTORY_LIMIT);
-    const pag = document.getElementById('pagination');
-    pag.innerHTML = totalPages > 1 ? Array.from({length: totalPages}, (_, i) =>
-      `<button class="page-btn ${i === page ? 'active' : ''}" onclick="loadHistory(${i})">${i + 1}</button>`
-    ).join('') : '';
-    currentHistoryPage = page;
-  } catch (error) {
-    document.getElementById('history-list').innerHTML = `<p style="color:var(--negative);text-align:center;padding:48px 0">${I18n.t('history.error')}: ${error.message}</p>`;
-  }
-}
-
-async function viewHistoryDetail(id) {
-  try {
-    const analysis = await APIClient.getAnalysis(id);
-    currentAnalysis = analysis;
-    displayAnalysisResults(analysis);
-    showSection('upload');
-    setTimeout(() => resultSection.scrollIntoView({ behavior: 'smooth' }), 100);
-  } catch (error) {
-    alert(I18n.t('history.error') + ': ' + error.message);
-  }
-}
-
-function showSection(section) {
-  if (section === 'upload') {
-    uploadSection.classList.remove('hidden');
-    historySection.classList.add('hidden');
-  } else {
-    uploadSection.classList.add('hidden');
-    historySection.classList.remove('hidden');
-    loadHistory(0);
-  }
-}
-
-function downloadReport() {
-  if (!currentAnalysis) return;
-  const json = JSON.stringify(currentAnalysis, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${currentAnalysis.stock_code ?? 'report'}_analysis.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+async function viewDrawerDetail(id){
+  try{
+    const a=await APIClient.getAnalysis(id);if(!a){alert('不存在');return}
+    if(!a.kline&&a.kline_data)a.kline=a.kline_data;
+    currentAnalysis=a;displayAnalysis(a);displayScore(a);displaySector(a);displayStrategy(a);closeDrawer();scrollToSection(1);
+  }catch(e){alert('失败:'+e.message)}
 }

@@ -11,6 +11,15 @@ const KlineParser = require('../utils/klineParser');
 const marketService = require('../services/marketService');
 const AIAnalysisService = require('../services/aiAnalysisService');
 const SignalEngine = require('../services/signalEngine');
+const sectorService = require('../services/sectorService');
+const relatedStockService = require('../services/relatedStockService');
+
+// ══ AI 推理层（新架构） ══
+const TrendAnalyzer   = require('../ai/trendAnalyzer');
+const RiskAnalyzer    = require('../ai/riskAnalyzer');
+const AI_SignalEngine = require('../ai/signalEngine');
+const StrategyEngine  = require('../ai/strategyEngine');
+const ReportGenerator = require('../ai/reportGenerator');
 
 const execFileAsync = promisify(execFile);
 
@@ -258,7 +267,80 @@ class AnalysisController {
       });
       console.log(`📡 信号引擎: ${signal.trend} | 强度:${signal.signal_strength} | 风险:${signal.risk_level}`);
 
-      // ── 步骤7: 指标分析摘要 ──
+      // ── 步骤6.6: 板块 + 相关股票 ──
+      let sector = { industry:'', change_percent:0, heat:'中性', description:'', concepts:[], region:'' };
+      let relatedStocks = [];
+      try {
+        sector = await sectorService.getSectorInfo(stockCode);
+        relatedStocks = await relatedStockService.getRelatedStocks(stockCode, sector.industry);
+        console.log(`📊 板块: ${sector.industry} | 相关股票: ${relatedStocks.length}只`);
+      } catch (err) {
+        console.warn(`⚠️ 板块信息获取失败: ${err.message}`);
+      }
+
+      // ═══════════════════════════════════════
+      // ── AI 推理层（新架构） ──
+      // ═══════════════════════════════════════
+
+      // 步骤 A: 趋势分析
+      const closes = klines.map(k => k.close).filter(v => v > 0);
+      const trendAnalysis = TrendAnalyzer.analyze({ price, mas, closes });
+      console.log(`📈 [AI/趋势] ${trendAnalysis.direction} ${trendAnalysis.strength} (${trendAnalysis.score})`);
+
+      // 步骤 B: 风险分析
+      const riskAnalysis = RiskAnalyzer.analyze({
+        price, changePct: changePercent,
+        support: supportResistance.support, resistance: supportResistance.resistance,
+        histogram, crossoverType: crossover.type,
+        latestVol: klines.length > 0 ? (klines[klines.length-1]?.volume || 0) : 0,
+        avgVol, klines,
+      });
+      console.log(`⚠️ [AI/风险] ${riskAnalysis.level} (${riskAnalysis.score})`);
+
+      // 步骤 C: 综合信号（新引擎）
+      const aiSignal = AI_SignalEngine.generate({
+        price, change_pct: changePercent, mas,
+        macd: macdLine, signal: signalLine, histogram,
+        crossover_type: crossover.type,
+        support: supportResistance.support, resistance: supportResistance.resistance,
+        klines,
+        latest_volume: klines.length > 0 ? (klines[klines.length-1]?.volume || 0) : 0,
+        avg_volume: avgVol,
+      });
+
+      // 步骤 D: 策略建议
+      const strategy = StrategyEngine.generate(trendAnalysis, riskAnalysis, {
+        price, support: supportResistance.support, resistance: supportResistance.resistance,
+        signalStrength: aiSignal.signal_strength,
+      });
+      console.log(`🎯 [AI/策略] ${strategy.bias} 置信度:${strategy.confidence}`);
+
+      // 步骤 E: 报告生成（统一数据结构）
+      const unifiedData = {
+        stock: { name: finalStockName, code: stockCode, price, change_percent: changePercent },
+        indicators: {
+          ma5: mas.ma5, ma10: mas.ma10, ma20: mas.ma20, ma60: mas.ma60,
+          dif: macdLine, dea: signalLine, macd: histogram,
+          support: supportResistance.support, resistance: supportResistance.resistance,
+          crossover_type: crossover.type,
+        },
+        market: { sector: sector.industry || '', related_stocks: relatedStocks },
+        signals: {
+          trend: aiSignal.trend,
+          signal_strength: aiSignal.signal_strength,
+          risk_level: aiSignal.risk_level,
+          active_signals: aiSignal.signals,
+          summary: aiSignal.summary,
+        },
+        strategy: {
+          bias: strategy.bias, confidence: strategy.confidence,
+          stopLoss: strategy.stopLoss, takeProfit: strategy.takeProfit,
+          position: strategy.position, reasoning: strategy.reasoning,
+        },
+      };
+      const aiReportV2 = ReportGenerator.generate(unifiedData);
+
+      // ── 步骤7: 指标分析摘要（保留兼容） ──
       const indicatorSummary = closePrices.length > 0
         ? Indicators.generateAnalysis(klines, {
             macd: macdLine,
@@ -285,11 +367,17 @@ class AnalysisController {
         macd_histogram: safeNumber(histogram),
         crossover: crossover.crossover || '无',
         crossover_type: crossover.type || 'none',
-        // 优先使用 AI 分析，回退到指标摘要
-        analysis: aiReport.analysis || indicatorSummary.analysis || '分析完成',
-        recommendation: aiReport.recommendation || indicatorSummary.recommendation || '中性',
-        risk: aiReport.risk || '中等',
-        key_points: aiReport.keyPoints || [],
+        // 优先使用 AI 分析（新引擎），回退到旧引擎，再回退到指标摘要
+        analysis: aiReportV2.analysis || aiReport.analysis || indicatorSummary.analysis || '分析完成',
+        recommendation: aiReportV2.recommendation || aiReport.recommendation || indicatorSummary.recommendation || '中性',
+        risk: aiReportV2.risk || aiReport.risk || '中等',
+        // ── 策略建议（新） ──
+        strategy_bias: strategy.bias || '观望',
+        strategy_confidence: strategy.confidence || 50,
+        strategy_stop_loss: strategy.stopLoss || 0,
+        strategy_take_profit: strategy.takeProfit || 0,
+        strategy_position: strategy.position || '轻仓',
+        key_points: aiReportV2.keyPoints || aiReport.keyPoints || [],
         // ── AI 信号引擎 ──
         signal_trend: signal.trend,
         signal_strength: signal.signal_strength,
@@ -297,6 +385,22 @@ class AnalysisController {
         signals: signal.signals || [],
         signal_summary: signal.summary || '',
         signal_factors: signal.factors || {},
+        // ── 板块 + 相关股票 ──
+        sector: {
+          name: sector.industry || '',
+          change_percent: safeNumber(sector.change_percent),
+          heat: sector.heat || '中性',
+          description: sector.description || '',
+          concepts: sector.concepts || [],
+          region: sector.region || '',
+        },
+        related_stocks: (relatedStocks || []).map(s => ({
+          name: s.name || '',
+          code: s.code || '',
+          price: safeNumber(s.price),
+          change_percent: safeNumber(s.change_pct),
+          tag: s.tag || '',
+        })),
         // 附加信息
         market_name: marketService.resolveMarket(stockCode).marketName,
         trend_direction: trend.direction,

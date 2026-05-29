@@ -48,7 +48,10 @@ function normalizeAnalysis(data) {
     macd: toNumber(data.macd, 0),
     signal: toNumber(data.signal, 0),
     macd_histogram: toNumber(data.macd_histogram, 0),
-    kline: Array.isArray(data.kline) ? data.kline : [],
+    kline: Array.isArray(data.kline) ? data.kline
+      : Array.isArray(data.kline_data) ? data.kline_data
+      : Array.isArray(data.klines) ? data.klines
+      : [],
   };
 }
 

@@ -1,914 +1,303 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title data-i18n>SnapVision — AI 金融终端</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
-  <style>
-    /* ══════════════════════════════════════════
-       SnapVision Liquid Glass Design System
-       iOS 26 + VisionOS inspired
-       ══════════════════════════════════════════ */
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-i18n>SnapVision — AI 金融终端</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
+<style>
+:root {
+  --bg: #0a0b0f; --surface: #111318; --elevated: #1a1d24;
+  --glass: rgba(255,255,255,0.03); --border: rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.12);
+  --accent: #f59e0b; --accent-glow: rgba(245,158,11,0.25);
+  --up: #ff6b6b; --down: #51cf66;
+  --t1: rgba(255,255,255,0.94); --t2: rgba(255,255,255,0.65); --t3: rgba(255,255,255,0.42);
+  --radius: 16px;
+  --ease: cubic-bezier(0.16,1,0.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC','Helvetica Neue',sans-serif;-webkit-font-smoothing:antialiased;font-size:16px;color:var(--t1);background:var(--bg);scroll-behavior:auto}
+html,body{overflow-x:hidden;max-width:100vw}
+body{background:var(--bg)}
 
-    :root {
-      /* Depth layers */
-      --bg-root: #000000;
-      --bg-base: #0a0a0f;
-      --bg-surface: rgba(18, 18, 24, 0.6);
-      --bg-elevated: rgba(28, 28, 36, 0.5);
+.scroll-container{
+  position:fixed;inset:0;overflow-y:auto;overflow-x:hidden;
+  max-width:100vw;
+}
+.scroll-container::-webkit-scrollbar{width:0}
+.section{
+  min-height:100vh;width:100%;max-width:100vw;
+  display:flex;align-items:center;justify-content:center;
+  padding:40px 24px;overflow-x:hidden;
+}
+.section-inner{width:100%;max-width:960px;margin:0 auto;overflow-x:hidden}
 
-      /* Glass */
-      --glass-bg: rgba(255, 255, 255, 0.04);
-      --glass-border: rgba(255, 255, 255, 0.08);
-      --glass-border-strong: rgba(255, 255, 255, 0.12);
-      --glass-highlight: rgba(255, 255, 255, 0.06);
-      --glass-shadow: rgba(0, 0, 0, 0.4);
+/* ── Background ── */
+.bg-orbs{position:fixed;inset:0;pointer-events:none;z-index:0}
+.bg-orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:0.06;will-change:transform}
+.bg-orb:nth-child(1){width:600px;height:600px;background:radial-gradient(circle,var(--accent-glow),transparent);top:-100px;left:-100px}
+.bg-orb:nth-child(2){width:400px;height:400px;background:radial-gradient(circle,rgba(81,207,102,0.12),transparent);bottom:-80px;right:-80px}
+.bg-orb:nth-child(3){width:300px;height:300px;background:radial-gradient(circle,rgba(245,158,11,0.08),transparent);top:40%;left:50%}
 
-      /* Accent */
-      --accent: #0a84ff;
-      --accent-glow: rgba(10, 132, 255, 0.3);
-      --accent-soft: rgba(10, 132, 255, 0.12);
+/* ── Glass Card ── */
+.glass{
+  background:var(--glass);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  box-shadow:0 2px 12px rgba(0,0,0,0.25);
+  max-width:100%;overflow:hidden;
+}
+.glass:hover{border-color:var(--border-strong)}
 
-      /* Finance */
-      --up: #ff3b6f;
-      --down: #32d74b;
-      --up-soft: rgba(255, 59, 111, 0.12);
-      --down-soft: rgba(50, 215, 75, 0.12);
+/* ── Nav ── */
+.top-nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;pointer-events:none}
+.top-nav>*{pointer-events:auto}
+.nav-logo{display:flex;align-items:center;gap:10px}
+.nav-logo-icon{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#f97316);display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff}
+.nav-logo-text{font-size:18px;font-weight:700;color:var(--t1)}
+.nav-actions{display:flex;gap:8px}
+.nav-btn{padding:8px 18px;border-radius:100px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.82);font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s var(--ease)}
+.nav-btn:hover{background:rgba(255,255,255,0.14);color:#fff;border-color:rgba(255,255,255,0.2)}
+.nav-btn.active{background:var(--accent);border-color:var(--accent);color:#000;font-weight:600}
 
-      /* Text */
-      --text-primary: rgba(255, 255, 255, 0.92);
-      --text-secondary: rgba(255, 255, 255, 0.6);
-      --text-tertiary: rgba(255, 255, 255, 0.38);
+/* ── HERO Section ── */
+.hero-content{text-align:center}
+.hero-title{font-size:clamp(36px,6vw,64px);font-weight:700;letter-spacing:-1.5px;line-height:1.08;margin-bottom:16px}
+.hero-sub{font-size:18px;color:var(--t2);margin-bottom:48px;line-height:1.5}
+.upload-zone{position:relative;width:100%;padding:64px 32px;text-align:center;cursor:pointer;overflow:hidden;transition:all 0.5s var(--ease);border:1px dashed rgba(255,255,255,0.12);border-radius:var(--radius);background:rgba(255,255,255,0.02)}
+.upload-zone:hover{border-color:var(--accent);background:rgba(245,158,11,0.04);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,0.3)}
+.upload-zone.drag-active{border-color:var(--accent);box-shadow:0 0 60px var(--accent-glow);background:rgba(245,158,11,0.06)}
+.upload-icon{font-size:48px;margin-bottom:16px}
+.upload-zone h3{font-size:20px;font-weight:600;margin-bottom:6px;color:var(--t1)}
+.upload-zone p{font-size:14px;color:var(--t3)}
+.scan-line{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0;animation:scan 2.5s ease-in-out infinite;pointer-events:none}
+@keyframes scan{0%{top:-2px;opacity:0}20%{opacity:1}80%{opacity:1}100%{top:100%;opacity:0}}
+.file-chosen{margin-top:16px;padding:10px 16px;border-radius:12px;background:rgba(245,158,11,0.08);font-size:13px;color:var(--accent);display:none;align-items:center;gap:8px}
+.file-chosen.show{display:flex}
 
-      /* Radius */
-      --r-sm: 12px;
-      --r-md: 20px;
-      --r-lg: 28px;
-      --r-xl: 36px;
+/* ── Analysis Section ── */
+.analysis-layout{display:flex;flex-direction:column;gap:20px;width:100%}
+.analysis-main{display:flex;flex-direction:column;gap:20px}
+.analysis-panels{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.stock-hero{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:12px}
+.stock-name{font-size:28px;font-weight:700;letter-spacing:-0.5px}
+.stock-code{font-size:14px;color:var(--t3);margin-top:4px}
+.stock-price{font-size:40px;font-weight:200;letter-spacing:-2px;font-variant-numeric:tabular-nums}
+.stock-change{display:inline-flex;align-items:center;gap:6px;padding:4px 14px;border-radius:100px;font-size:14px;font-weight:600;margin-top:4px}
+.stock-change.up{background:rgba(255,107,107,0.12);color:var(--up)}
+.stock-change.down{background:rgba(81,207,102,0.12);color:var(--down)}
+.chart-wrap{position:relative;height:300px;margin:0}
+.chart-wrap.vol{height:100px}
+.signal-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.signal-row:last-child{border-bottom:none}
+.signal-label{font-size:13px;color:var(--t2);font-weight:500}
+.signal-value{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.badge{display:inline-flex;align-items:center;padding:4px 12px;border-radius:100px;font-size:12px;font-weight:600}
+.badge-bull{background:rgba(255,107,107,0.12);color:var(--up)}
+.badge-bear{background:rgba(81,207,102,0.12);color:var(--down)}
+.badge-neutral{background:rgba(255,255,255,0.06);color:var(--t2)}
 
-      /* Easing */
-      --ease-spring: cubic-bezier(0.22, 0.61, 0.36, 1);
-      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-      --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-    }
+.sector-scroll{display:flex;gap:10px;overflow-x:auto;padding:4px 0 8px;scroll-snap-type:x mandatory}
+.sector-scroll::-webkit-scrollbar{height:0}
+.sector-card{min-width:180px;padding:16px;scroll-snap-align:start;flex-shrink:0}
+.sector-card-name{font-size:15px;font-weight:600;margin-bottom:4px}
+.sector-card-price{font-size:18px;font-weight:700}
+.sector-card-change{font-size:12px;font-weight:600;margin-top:4px}
+.sector-card-change.up{color:var(--up)}.sector-card-change.down{color:var(--down)}
+.sector-card-tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;background:rgba(255,255,255,0.05);color:var(--t3);margin-top:6px}
+.tag-row{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-block;padding:4px 10px;border-radius:8px;font-size:11px;background:rgba(255,255,255,0.05);color:var(--t2)}
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+.score-ring{position:relative;width:140px;height:140px}
+.score-ring svg{position:absolute;inset:0}
+.score-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.score-num{font-size:42px;font-weight:200;letter-spacing:-2px;line-height:1}
+.score-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.m-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:4px}
+.m-badge{display:inline-block;padding:3px 12px;border-radius:100px;font-size:12px;font-weight:600;background:rgba(255,255,255,0.06);color:var(--t2)}
+.strat-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--t2)}
+.strat-val{font-weight:600;color:var(--t1)}
+.strat-val.s-sm{font-size:12px}
 
-    html {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
-      -webkit-font-smoothing: antialiased;
-      font-size: 16px;
-      color: var(--text-primary);
-      background: var(--bg-root);
-    }
+/* ── Reset Section ── */
+.reset-content{text-align:center}
+.reset-title{font-size:clamp(28px,4vw,48px);font-weight:700;letter-spacing:-1px;margin-bottom:16px}
+.reset-sub{font-size:16px;color:var(--t2);margin-bottom:40px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 32px;border-radius:100px;border:none;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.3s var(--ease)}
+.btn-primary{background:var(--accent);color:#000;box-shadow:0 4px 16px var(--accent-glow)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px var(--accent-glow)}
+.btn-ghost{background:rgba(255,255,255,0.06);color:var(--t1);border:1px solid var(--border)}
+.btn-ghost:hover{background:rgba(255,255,255,0.12)}
+.btn-group{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
 
-    body {
-      min-height: 100vh;
-      background:
-        radial-gradient(ellipse 80% 60% at 20% 0%, rgba(10, 132, 255, 0.08), transparent 60%),
-        radial-gradient(ellipse 60% 50% at 80% 100%, rgba(50, 215, 75, 0.04), transparent 60%),
-        radial-gradient(ellipse 50% 40% at 50% 30%, rgba(120, 86, 255, 0.04), transparent 50%),
-        var(--bg-base);
-      overflow-x: hidden;
-    }
+/* ── History Drawer ── */
+.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;opacity:0;pointer-events:none;transition:opacity 0.3s var(--ease)}
+.drawer-overlay.open{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;width:420px;max-width:90vw;height:100vh;background:var(--surface);border-left:1px solid var(--border);z-index:201;transform:translateX(100%);transition:transform 0.4s var(--ease);overflow-y:auto;padding:24px}
+.drawer.open{transform:translateX(0)}
+.drawer-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+.drawer-title{font-size:18px;font-weight:700}
+.drawer-close{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--t2);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+.drawer-item{padding:14px 16px;margin:4px 0;border-radius:12px;background:rgba(255,255,255,0.02);border:1px solid var(--border);cursor:pointer;transition:all 0.2s var(--ease)}
+.drawer-item:hover{background:rgba(255,255,255,0.05);border-color:var(--border-strong)}
+.drawer-item-name{font-size:14px;font-weight:600}
+.drawer-item-meta{font-size:12px;color:var(--t3);margin-top:4px;display:flex;gap:12px}
+.drawer-pagination{display:flex;gap:6px;justify-content:center;margin-top:16px}
+.drawer-pagination button{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--t2);cursor:pointer;font-size:12px}
+.drawer-pagination button.active{background:var(--accent);color:#000;border-color:var(--accent)}
 
-    /* ── Animated background orbs ── */
-    .bg-orb {
-      position: fixed;
-      border-radius: 50%;
-      filter: blur(120px);
-      opacity: 0.15;
-      pointer-events: none;
-      z-index: 0;
-      animation: orbFloat 20s ease-in-out infinite;
-    }
-    .bg-orb-1 {
-      width: 600px; height: 600px;
-      background: radial-gradient(circle, var(--accent-glow), transparent);
-      top: -200px; left: -100px;
-      animation-delay: 0s;
-    }
-    .bg-orb-2 {
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(120, 86, 255, 0.25), transparent);
-      bottom: -150px; right: -150px;
-      animation-delay: -7s;
-      animation-duration: 24s;
-    }
-    .bg-orb-3 {
-      width: 400px; height: 400px;
-      background: radial-gradient(circle, rgba(50, 215, 75, 0.2), transparent);
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      animation-delay: -14s;
-      animation-duration: 28s;
-    }
+/* ── AI text ── */
+.ai-text{font-size:15px;line-height:1.75;color:var(--t2)}
+.ai-text strong{color:var(--t1);font-weight:600}
 
-    @keyframes orbFloat {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      25% { transform: translate(40px, -30px) scale(1.1); }
-      50% { transform: translate(-20px, -60px) scale(0.9); }
-      75% { transform: translate(-50px, 20px) scale(1.05); }
-    }
-
-    /* ── Liquid Glass Card ── */
-    .glass {
-      position: relative;
-      background: var(--glass-bg);
-      backdrop-filter: blur(40px) saturate(160%);
-      -webkit-backdrop-filter: blur(40px) saturate(160%);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--r-lg);
-      box-shadow:
-        0 8px 32px var(--glass-shadow),
-        inset 0 1px 0 var(--glass-highlight);
-      transition: border-color 0.4s var(--ease-out), box-shadow 0.4s var(--ease-out);
-    }
-    .glass::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 50%, rgba(255,255,255,0.02) 100%);
-      pointer-events: none;
-    }
-    .glass:hover {
-      border-color: var(--glass-border-strong);
-      box-shadow:
-        0 12px 40px var(--glass-shadow),
-        0 0 0 1px var(--glass-border-strong),
-        inset 0 1px 0 rgba(255,255,255,0.08);
-    }
-
-    .glass-elevated {
-      background: rgba(255, 255, 255, 0.06);
-      backdrop-filter: blur(60px) saturate(180%);
-      -webkit-backdrop-filter: blur(60px) saturate(180%);
-      border: 1px solid var(--glass-border-strong);
-      box-shadow:
-        0 16px 48px rgba(0,0,0,0.5),
-        0 0 0 1px rgba(255,255,255,0.06),
-        inset 0 1px 0 rgba(255,255,255,0.1);
-    }
-
-    /* ── Layout ── */
-    .app-container {
-      position: relative;
-      z-index: 1;
-      max-width: 1280px;
-      margin: 0 auto;
-      padding: 24px 20px 80px;
-    }
-
-    .app-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px 24px;
-      margin-bottom: 32px;
-    }
-    .app-logo {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .app-logo-icon {
-      width: 40px; height: 40px;
-      border-radius: var(--r-sm);
-      background: linear-gradient(135deg, var(--accent), #5e5ce6);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      box-shadow: 0 4px 16px var(--accent-glow);
-    }
-    .app-logo-text h1 {
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.3px;
-      color: var(--text-primary);
-    }
-    .app-logo-text span {
-      font-size: 12px;
-      color: var(--text-tertiary);
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-    }
-    .app-nav {
-      display: flex;
-      gap: 4px;
-    }
-    .nav-btn {
-      padding: 8px 20px;
-      border-radius: 100px;
-      border: none;
-      background: transparent;
-      color: var(--text-secondary);
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.3s var(--ease-out);
-    }
-    .nav-btn:hover { color: var(--text-primary); background: rgba(255,255,255,0.06); }
-    .nav-btn.active { color: var(--text-primary); background: rgba(255,255,255,0.1); font-weight: 600; }
-
-    /* ── Upload Terminal ── */
-    .upload-terminal {
-      position: relative;
-      padding: 60px 40px;
-      text-align: center;
-      cursor: pointer;
-      overflow: hidden;
-      transition: all 0.6s var(--ease-spring);
-    }
-    .upload-terminal.drag-over {
-      border-color: var(--accent) !important;
-      box-shadow:
-        0 0 80px var(--accent-glow),
-        inset 0 0 60px rgba(10,132,255,0.06);
-      transform: scale(1.01);
-    }
-    .upload-terminal.drag-over .scan-line {
-      opacity: 1;
-    }
-    .upload-icon-ring {
-      width: 80px; height: 80px;
-      margin: 0 auto 24px;
-      border-radius: 50%;
-      background: var(--accent-soft);
-      border: 2px solid rgba(10,132,255,0.2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 32px;
-      animation: iconPulse 3s ease-in-out infinite;
-    }
-    @keyframes iconPulse {
-      0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
-      50% { box-shadow: 0 0 0 16px transparent; }
-    }
-    .upload-terminal h3 {
-      font-size: 20px;
-      font-weight: 600;
-      letter-spacing: -0.2px;
-      margin-bottom: 8px;
-    }
-    .upload-terminal p {
-      color: var(--text-secondary);
-      font-size: 14px;
-      margin-bottom: 4px;
-    }
-    .scan-line {
-      position: absolute;
-      left: 0; right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, var(--accent), transparent);
-      opacity: 0;
-      animation: scanDown 2s ease-in-out infinite;
-      pointer-events: none;
-    }
-    @keyframes scanDown {
-      0% { top: -2px; opacity: 0; }
-      20% { opacity: 1; }
-      80% { opacity: 1; }
-      100% { top: 100%; opacity: 0; }
-    }
-
-    /* ── Processing State ── */
-    .processing-panel {
-      display: none;
-      padding: 40px;
-      text-align: center;
-    }
-    .processing-panel.visible { display: block; }
-
-    .processing-ring {
-      width: 64px; height: 64px;
-      margin: 0 auto 20px;
-      border-radius: 50%;
-      border: 2px solid var(--glass-border);
-      border-top-color: var(--accent);
-      animation: procSpin 0.8s linear infinite;
-    }
-    @keyframes procSpin { to { transform: rotate(360deg); } }
-
-    .proc-steps {
-      display: flex;
-      justify-content: center;
-      gap: 8px;
-      margin-top: 12px;
-    }
-    .proc-step {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--glass-border);
-      transition: all 0.4s var(--ease-out);
-    }
-    .proc-step.active { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
-    .proc-step.done { background: var(--down); }
-
-    /* ── Results Grid ── */
-    .results-grid {
-      display: none;
-      grid-template-columns: 1fr 360px;
-      gap: 24px;
-      animation: fadeSlideUp 0.6s var(--ease-spring);
-    }
-    .results-grid.visible { display: grid; }
-
-    @keyframes fadeSlideUp {
-      from { opacity: 0; transform: translateY(24px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 20px;
-    }
-    .card-title {
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      color: var(--text-tertiary);
-    }
-
-    /* ── Stock Hero ── */
-    .stock-hero {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      margin-bottom: 24px;
-    }
-    .stock-name-display {
-      font-size: 28px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
-    }
-    .stock-meta {
-      font-size: 13px;
-      color: var(--text-tertiary);
-      margin-top: 4px;
-    }
-    .stock-price-display {
-      text-align: right;
-    }
-    .price-big {
-      font-size: 40px;
-      font-weight: 200;
-      letter-spacing: -2px;
-      font-variant-numeric: tabular-nums;
-    }
-    .price-change {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 12px;
-      border-radius: 100px;
-      font-size: 14px;
-      font-weight: 600;
-      margin-top: 4px;
-    }
-    .price-change.up { background: var(--up-soft); color: var(--up); }
-    .price-change.down { background: var(--down-soft); color: var(--down); }
-    .price-change.flat { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
-
-    /* ── Chart Area ── */
-    .chart-wrap {
-      position: relative;
-      height: 340px;
-      margin: 8px 0;
-    }
-    .chart-wrap.volume { height: 120px; }
-
-    /* ── Meta bar ── */
-    .meta-bar {
-      display: flex;
-      gap: 24px;
-      flex-wrap: wrap;
-      padding-top: 16px;
-      border-top: 1px solid var(--glass-border);
-    }
-    .meta-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      color: var(--text-tertiary);
-    }
-    .meta-dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--accent);
-    }
-
-    /* ── Indicators Panel ── */
-    .indicator-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 14px 0;
-      border-bottom: 1px solid var(--glass-border);
-    }
-    .indicator-row:last-child { border-bottom: none; }
-    .indicator-label {
-      font-size: 13px;
-      color: var(--text-secondary);
-    }
-    .indicator-value {
-      font-size: 15px;
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-    }
-    .indicator-value.up { color: var(--up); }
-    .indicator-value.down { color: var(--down); }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 4px 12px;
-      border-radius: 100px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-    .badge-golden { background: var(--down-soft); color: var(--down); }
-    .badge-dead { background: var(--up-soft); color: var(--up); }
-    .badge-neutral { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
-
-    /* ── AI Panel ── */
-    .ai-panel {
-      position: relative;
-      overflow: hidden;
-    }
-    .ai-panel::before {
-      content: '';
-      position: absolute;
-      inset: -2px;
-      border-radius: inherit;
-      padding: 2px;
-      background: linear-gradient(135deg, var(--accent), #5e5ce6, var(--accent));
-      background-size: 200% 200%;
-      animation: aiBorder 4s ease infinite;
-      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      pointer-events: none;
-    }
-    @keyframes aiBorder {
-      0%, 100% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-    }
-
-    .ai-breath {
-      position: absolute;
-      top: -40px; right: -40px;
-      width: 120px; height: 120px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(120,86,255,0.15), transparent 70%);
-      animation: aiBreath 4s ease-in-out infinite;
-      pointer-events: none;
-    }
-    @keyframes aiBreath {
-      0%, 100% { transform: scale(1); opacity: 0.6; }
-      50% { transform: scale(1.3); opacity: 1; }
-    }
-
-    .ai-analysis-text {
-      font-size: 14px;
-      line-height: 1.7;
-      color: var(--text-secondary);
-      position: relative;
-      z-index: 1;
-    }
-    .ai-analysis-text strong {
-      color: var(--text-primary);
-      font-weight: 600;
-    }
-
-    .key-point {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      padding: 8px 12px;
-      background: rgba(255,255,255,0.03);
-      border-radius: var(--r-sm);
-      font-size: 13px;
-      color: var(--text-secondary);
-      margin-top: 8px;
-    }
-    .key-point::before {
-      content: '•';
-      color: var(--accent);
-      font-weight: bold;
-    }
-
-    /* ── Buttons ── */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 12px 28px;
-      border-radius: 100px;
-      border: none;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s var(--ease-out);
-      width: 100%;
-    }
-    .btn-primary {
-      background: var(--accent);
-      color: #fff;
-      box-shadow: 0 4px 16px var(--accent-glow);
-    }
-    .btn-primary:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 8px 24px var(--accent-glow);
-    }
-    .btn-secondary {
-      background: rgba(255,255,255,0.06);
-      color: var(--text-primary);
-      border: 1px solid var(--glass-border);
-    }
-    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
-
-    .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; }
-
-    /* ── History ── */
-    .history-item {
-      padding: 20px;
-      cursor: pointer;
-      transition: all 0.3s var(--ease-out);
-    }
-    .history-item:hover { background: rgba(255,255,255,0.04); }
-
-    /* ── Error ── */
-    .error-panel {
-      display: none;
-      padding: 32px;
-      text-align: center;
-    }
-    .error-panel.visible { display: block; }
-    .error-icon {
-      width: 56px; height: 56px;
-      margin: 0 auto 16px;
-      border-radius: 50%;
-      background: var(--up-soft);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-    }
-
-    /* ── Responsive ── */
-    @media (max-width: 900px) {
-      .results-grid { grid-template-columns: 1fr; }
-      .stock-hero { flex-direction: column; gap: 16px; }
-      .stock-price-display { text-align: left; }
-      .price-big { font-size: 32px; }
-      .chart-wrap { height: 260px; }
-      .upload-terminal { padding: 40px 20px; }
-      .app-header { flex-direction: column; gap: 16px; }
-    }
-    @media (max-width: 480px) {
-      .app-container { padding: 12px 12px 60px; }
-      .stock-name-display { font-size: 22px; }
-      .price-big { font-size: 28px; }
-      .chart-wrap { height: 200px; }
-    }
-
-    /* ── File Info ── */
-    .file-chosen {
-      display: none;
-      padding: 10px 16px;
-      margin-top: 12px;
-      border-radius: var(--r-sm);
-      background: var(--accent-soft);
-      font-size: 13px;
-    }
-    .file-chosen.visible { display: flex; align-items: center; gap: 8px; }
-
-    /* Smooth section transitions */
-    section { transition: opacity 0.4s var(--ease-out), transform 0.4s var(--ease-out); }
-    section.hidden { display: none; }
-
-    /* ── Utility Classes ── */
-    .text-positive { color: var(--up) !important; }
-    .text-negative { color: var(--down) !important; }
-    .badge-bull { background: var(--up-soft); color: var(--up); }
-    .badge-bear { background: var(--down-soft); color: var(--down); }
-    .risk-high { color: var(--up); }
-    .risk-mid { color: #ff9f0a; }
-    .risk-low { color: var(--down); }
-    .stock-change.up { color: var(--up); }
-    .stock-change.down { color: var(--down); }
-    .history-change.up { color: var(--up); }
-    .history-change.down { color: var(--down); }
-
-    @keyframes cardEnter {
-      from { opacity: 0; transform: translateY(20px) scale(0.98); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-    .card-enter { animation: cardEnter 0.5s var(--ease-spring) both; }
-    .glass-card { /* alias for history items */ }
-
-    .kp-tag {
-      display: block;
-      padding: 8px 14px;
-      margin-top: 6px;
-      background: rgba(255,255,255,0.03);
-      border-radius: var(--r-sm);
-      font-size: 13px;
-      color: var(--text-secondary);
-    }
-
-    .section-tag {
-      display: block;
-      margin: 16px 0 6px;
-      font-size: 13px;
-      letter-spacing: 0.6px;
-      text-transform: uppercase;
-      color: var(--accent);
-    }
-
-    .upload-terminal.scanning { pointer-events: none; }
-    .upload-terminal.scanning .scan-line { opacity: 1 !important; }
-    .upload-terminal.scanning .upload-icon-ring {
-      animation: iconPulse 0.8s ease-in-out infinite;
-      border-color: var(--accent);
-      background: var(--accent-soft);
-    }
-
-    .processing-panel.visible { display: block !important; }
-    .results-grid.visible { display: grid !important; }
-    .error-panel.visible { display: block !important; }
-    .file-chosen.visible { display: flex !important; align-items: center; gap: 8px; }
-
-    /* ── History item styles ── */
-    .history-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 18px 20px;
-      cursor: pointer;
-      border-bottom: 1px solid var(--glass-border);
-      transition: background 0.2s var(--ease-out);
-    }
-    .history-item:last-child { border-bottom: none; }
-    .history-item:hover { background: rgba(255,255,255,0.03); }
-    .history-left { display: flex; flex-direction: column; gap: 4px; }
-    .history-name { font-size: 15px; font-weight: 600; }
-    .history-code { font-size: 12px; color: var(--text-tertiary); }
-    .history-right { text-align: right; }
-    .history-price { font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
-    .history-change { font-size: 13px; font-weight: 600; margin-top: 2px; }
-    .history-date { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
-    .page-btn {
-      padding: 6px 14px;
-      border-radius: 100px;
-      border: 1px solid var(--glass-border);
-      background: transparent;
-      color: var(--text-secondary);
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .page-btn:hover { background: rgba(255,255,255,0.06); }
-    .page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-
-    /* ── Signal Engine Card ── */
-    .signal-strength-ring {
-      width: 70px; height: 70px;
-      border-radius: 50%;
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 12px;
-    }
-    .signal-strength-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
-    .signal-strength-ring .strength-num {
-      font-size: 22px; font-weight: 200; letter-spacing: -1px;
-      position: relative; z-index: 1;
-    }
-    .signal-badge {
-      display: inline-flex; align-items: center; gap: 4px;
-      padding: 4px 10px; border-radius: 100px;
-      font-size: 11px; font-weight: 600; letter-spacing: 0.4px;
-      text-transform: uppercase;
-    }
-    .signal-badge.bullish { background: rgba(50,215,75,0.15); color: var(--down); }
-    .signal-badge.bearish { background: var(--up-soft); color: var(--up); }
-    .signal-badge.neutral { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
-    .signal-tag {
-      display: inline-block; padding: 3px 8px; border-radius: 6px;
-      font-size: 11px; margin: 2px;
-      background: rgba(255,255,255,0.05); color: var(--text-secondary);
-    }
-    .signal-tag.bull { background: rgba(50,215,75,0.1); color: var(--down); }
-    .signal-tag.bear { background: var(--up-soft); color: var(--up); }
-    .factor-bar {
-      display: flex; align-items: center; gap: 6px; padding: 5px 0;
-    }
-    .factor-bar .factor-label { font-size: 11px; color: var(--text-tertiary); width: 70px; text-align: right; }
-    .factor-bar .factor-track { flex:1; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
-    .factor-bar .factor-fill { height: 100%; border-radius: 2px; transition: width 0.8s var(--ease-out); }
-  </style>
+/* ── Responsive ── */
+@media(max-width:768px){
+  .analysis-panels,.strategy-grid{grid-template-columns:1fr}
+  .stock-hero{flex-direction:column}
+  .stock-price{font-size:32px}
+  .hero-title{font-size:32px}
+  .drawer{width:100vw}
+  .section{padding:24px 16px}
+}
+</style>
 </head>
 <body>
 
-  <!-- Animated background orbs -->
-  <div class="bg-orb bg-orb-1"></div>
-  <div class="bg-orb bg-orb-2"></div>
-  <div class="bg-orb bg-orb-3"></div>
+<div class="bg-orbs"><div class="bg-orb"></div><div class="bg-orb"></div><div class="bg-orb"></div></div>
 
-  <div class="app-container">
-    <!-- Header -->
-    <header class="app-header">
-      <div class="app-logo">
-        <div class="app-logo-icon">◆</div>
-        <div class="app-logo-text">
-          <h1>SnapVision</h1>
-          <span>AI Financial Terminal</span>
-        </div>
-      </div>
-      <nav class="app-nav">
-        <button class="nav-btn active" onclick="showSection('upload')" id="nav-upload" data-i18n>Analyze</button>
-        <button class="nav-btn" onclick="showSection('history')" id="nav-history" data-i18n>History</button>
-        <button class="nav-btn lang-switch" onclick="I18n.toggle()" id="lang-switch" data-i18n>EN</button>
-      </nav>
-    </header>
+<!-- Top Nav -->
+<nav class="top-nav">
+  <div class="nav-logo">
+    <div class="nav-logo-icon">◆</div>
+    <span class="nav-logo-text">SnapVision</span>
+  </div>
+  <div class="nav-actions">
+    <button class="nav-btn" onclick="openDrawer()" data-i18n>History</button>
+    <button class="nav-btn" onclick="I18n.toggle()" id="lang-switch" data-i18n>EN</button>
+  </div>
+</nav>
 
-    <!-- Upload Section -->
-    <section id="upload-section">
-      <div class="glass upload-terminal" id="upload-zone">
+<!-- History Drawer -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <span class="drawer-title" data-i18n>Analysis History</span>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div id="drawer-list"></div>
+  <div class="drawer-pagination" id="drawer-pagination"></div>
+</div>
+
+<!-- Scroll Container -->
+<div class="scroll-container" id="scroll-container">
+
+  <!-- SECTION 1: HERO / UPLOAD -->
+  <section class="section active" id="sec-hero">
+    <div class="section-inner hero-content">
+      <h1 class="hero-title">AI 股票分析系统</h1>
+      <p class="hero-sub">上传截图，即可生成 AI 趋势分析与风险判断</p>
+      <div class="upload-zone glass" id="upload-zone">
         <div class="scan-line"></div>
-        <div class="upload-icon-ring">📡</div>
-        <h3 data-i18n>Drop screenshot to analyze</h3>
-        <p data-i18n>Supports JPG, PNG, GIF, WebP — Max 10MB</p>
-        <p style="font-size:12px;color:var(--text-tertiary);margin-top:6px" data-i18n>AI will extract stock code, fetch real‑time data, and generate analysis</p>
+        <div class="upload-icon">📡</div>
+        <h3>点击或拖拽上传股票截图</h3>
+        <p>支持 JPG、PNG、GIF、WebP — 最大 10MB</p>
         <input type="file" id="file-input" accept="image/*" style="display:none">
       </div>
-
       <div class="file-chosen" id="file-info">
-        <span style="color:var(--accent)">📎</span>
-        <span id="file-name" style="font-weight:500"></span>
+        <span>📎</span><span id="file-name"></span>
       </div>
+      <div id="loading-indicator" style="display:none;margin-top:24px">
+        <div style="width:40px;height:40px;border-radius:50%;border:2px solid var(--border);border-top-color:var(--accent);animation:spin 0.8s linear infinite;margin:0 auto 12px"></div>
+        <p style="color:var(--t2);font-size:14px">AI 正在分析…</p>
+      </div>
+    </div>
+  </section>
 
-      <!-- Processing -->
-      <div class="glass processing-panel" id="loading-state">
-        <div class="processing-ring"></div>
-        <p style="color:var(--text-secondary)" data-i18n>Processing screenshot…</p>
-        <div class="proc-steps">
-          <div class="proc-step active" id="step-ocr"></div>
-          <div class="proc-step" id="step-market"></div>
-          <div class="proc-step" id="step-indicators"></div>
-          <div class="proc-step" id="step-ai"></div>
+  <!-- SECTION 2: ANALYSIS -->
+  <section class="section" id="sec-analysis">
+    <div class="section-inner">
+      <div class="analysis-layout">
+
+        <div class="glass" style="padding:28px">
+          <div class="stock-hero">
+            <div><div class="stock-name" id="stock-name">--</div><div class="stock-code" id="stock-code">--</div></div>
+            <div><div class="stock-price" id="current-price">--</div><div class="stock-change flat" id="change-percent">--</div></div>
+          </div>
+          <div class="chart-wrap"><canvas id="kline-chart"></canvas></div>
+          <div class="chart-wrap vol"><canvas id="volume-chart"></canvas></div>
         </div>
-      </div>
 
-      <!-- Error -->
-      <div class="glass error-panel" id="error-state">
-        <div class="error-icon">⚠️</div>
-        <h4 style="font-weight:600;margin-bottom:8px" data-i18n>Analysis Error</h4>
-        <p id="error-message" style="color:var(--text-secondary);font-size:14px"></p>
-        <button onclick="resetUpload()" class="btn btn-secondary" style="width:auto;margin-top:16px" data-i18n>Try Again</button>
-      </div>
-
-      <!-- Results -->
-      <div class="results-grid" id="result-section">
-        <!-- Main Column -->
-        <div style="display:flex;flex-direction:column;gap:24px">
-          <!-- Stock Hero Card -->
-          <div class="glass" style="padding:28px">
-            <div class="stock-hero">
-              <div>
-                <div class="stock-name-display" id="stock-name">--</div>
-                <div class="stock-meta">
-                  <span id="stock-code"></span>
-                  <span style="margin:0 8px">·</span>
-                  <span id="market-tag"></span>
-                </div>
+        <div class="analysis-panels">
+          <div class="glass" style="padding:20px">
+            <div class="signal-row"><span class="signal-label">趋势方向</span><span class="signal-value" id="trend-direction">--</span></div>
+            <div class="signal-row"><span class="signal-label">信号强度</span><span class="signal-value" id="signal-strength">--</span></div>
+            <div class="signal-row"><span class="signal-label">风险等级</span><span class="signal-value" id="risk-level">--</span></div>
+            <div class="signal-row"><span class="signal-label">MACD</span><span class="signal-value" id="macd-value">--</span></div>
+            <div class="signal-row"><span class="signal-label">支撑位</span><span class="signal-value" id="support-value">--</span></div>
+            <div class="signal-row"><span class="signal-label">压力位</span><span class="signal-value" id="resistance-value">--</span></div>
+            <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span style="font-size:13px;font-weight:700" id="sector-name">--</span>
+                <span class="badge badge-neutral" id="sector-heat">--</span>
               </div>
-              <div class="stock-price-display">
-                <div class="price-big" id="current-price">--</div>
-                <div class="price-change flat" id="change-percent">--</div>
-              </div>
-            </div>
-
-            <!-- Chart -->
-            <div class="chart-wrap"><canvas id="kline-chart"></canvas></div>
-            <div class="chart-wrap volume"><canvas id="volume-chart"></canvas></div>
-
-            <!-- Meta -->
-            <div class="meta-bar">
-              <div class="meta-item"><div class="meta-dot"></div><span id="data-source-tag">--</span></div>
-              <div class="meta-item"><span id="data-time" style="color:var(--text-tertiary)"></span></div>
+              <div class="tag-row" id="sector-concepts" style="margin-bottom:10px"></div>
+              <div class="sector-scroll" id="sector-cards"></div>
             </div>
           </div>
-
-          <!-- AI Analysis Card -->
-          <div class="glass ai-panel" style="padding:28px">
-            <div class="ai-breath"></div>
-            <div class="card-header">
-              <span class="card-title" data-i18n>AI Intelligence</span>
-              <span style="font-size:11px;color:var(--accent);letter-spacing:0.5px" data-i18n>GENERATED</span>
+          <div class="glass" style="padding:24px;display:flex;flex-direction:column;align-items:center;gap:18px">
+            <div class="score-ring">
+              <svg width="140" height="140" viewBox="0 0 140 140">
+                <circle cx="70" cy="70" r="60" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
+                <circle id="score-arc" cx="70" cy="70" r="60" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-dasharray="377" stroke-dashoffset="377" transform="rotate(-90 70 70)"/>
+              </svg>
+              <div class="score-inner">
+                <div class="score-num" id="score-num">--</div>
+                <div class="score-label">AI 综合评分</div>
+              </div>
             </div>
-            <div class="ai-analysis-text" id="analysis-text" style="position:relative;z-index:1"></div>
-            <div id="key-points" style="position:relative;z-index:1"></div>
+            <div style="display:flex;gap:12px;width:100%">
+              <div style="flex:1;text-align:center"><div class="m-label">趋势</div><div class="m-badge" id="score-trend">--</div></div>
+              <div style="flex:1;text-align:center"><div class="m-label">风险</div><div class="m-badge" id="score-risk">--</div></div>
+            </div>
+            <div style="width:100%;border-top:1px solid var(--border);padding-top:14px;display:flex;flex-direction:column;gap:8px">
+              <div class="strat-row"><span>操作倾向</span><span class="strat-val" id="strategy-bias">--</span></div>
+              <div class="strat-row"><span>置信度</span><span class="strat-val" id="strategy-confidence">--</span></div>
+              <div class="strat-row"><span>止损 / 止盈</span><span class="strat-val s-sm"><span id="strategy-stop">--</span> / <span id="strategy-take">--</span></span></div>
+              <div class="strat-row"><span>仓位建议</span><span class="strat-val" id="strategy-position">--</span></div>
+            </div>
           </div>
         </div>
 
-        <!-- Side Panel -->
-        <div style="display:flex;flex-direction:column;gap:24px">
-          <!-- Signal Engine -->
-          <div class="glass" style="padding:24px">
-            <div class="card-title" style="margin-bottom:16px">⚡ AI Signal Engine</div>
-            <div class="signal-strength-ring" id="signal-ring">
-              <svg width="70" height="70" viewBox="0 0 70 70"><circle cx="35" cy="35" r="30" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="4"/><circle id="signal-arc" cx="35" cy="35" r="30" fill="none" stroke="#0a84ff" stroke-width="4" stroke-linecap="round" stroke-dasharray="188.5" stroke-dashoffset="188.5"/></svg>
-              <span class="strength-num" id="signal-num">--</span>
-            </div>
-            <div style="text-align:center;margin-bottom:14px">
-              <span class="signal-badge neutral" id="signal-trend-badge">--</span>
-            </div>
-            <div id="signal-tags" style="margin-bottom:14px;text-align:center"></div>
-            <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:16px" id="signal-summary"></div>
-            <div id="signal-factors"></div>
-          </div>
-
-          <!-- Indicators -->
-          <div class="glass" style="padding:24px">
-            <div class="card-title" style="margin-bottom:8px" data-i18n>Technical Indicators</div>
-
-            <div class="indicator-row">
-              <span class="indicator-label"><span data-i18n>Support</span> <span id="support-dist" style="font-size:11px;opacity:0.6"></span></span>
-              <span class="indicator-value down" id="support-value">--</span>
-            </div>
-            <div class="indicator-row">
-              <span class="indicator-label"><span data-i18n>Resistance</span> <span id="resistance-dist" style="font-size:11px;opacity:0.6"></span></span>
-              <span class="indicator-value up" id="resistance-value">--</span>
-            </div>
-            <div class="indicator-row">
-              <span class="indicator-label" data-i18n>MACD</span>
-              <span class="indicator-value" id="macd-value">--</span>
-            </div>
-            <div class="indicator-row">
-              <span class="indicator-label" data-i18n>Signal</span>
-              <span class="indicator-value" id="signal-value">--</span>
-            </div>
-            <div class="indicator-row">
-              <span class="indicator-label" data-i18n>Histogram</span>
-              <span class="indicator-value" id="histogram-value">--</span>
-            </div>
-
-            <div style="display:flex;justify-content:space-between;padding:14px 0;border-top:1px solid var(--glass-border);margin-top:8px">
-              <div>
-                <div class="indicator-label" data-i18n>Trend</div>
-                <div style="font-size:20px;font-weight:700;margin-top:4px" id="trend-direction">--</div>
-              </div>
-              <div style="text-align:right">
-                <div class="indicator-label" data-i18n>Risk</div>
-                <div style="font-size:20px;font-weight:700;margin-top:4px" id="risk-level">--</div>
-              </div>
-            </div>
-
-            <div class="indicator-row">
-              <span class="indicator-label" data-i18n>Signal</span>
-              <span id="crossover-badge" class="badge badge-neutral">--</span>
-            </div>
-            <div class="indicator-row">
-              <span class="indicator-label" data-i18n>Recommendation</span>
-              <span style="font-weight:600;font-size:14px" id="recommendation-badge">--</span>
-            </div>
-
-            <div class="btn-group">
-              <button onclick="downloadReport()" class="btn btn-primary" data-i18n>Download Report</button>
-              <button onclick="resetUpload()" class="btn btn-secondary" data-i18n>New Analysis</button>
-            </div>
-          </div>
+        <div class="glass" style="padding:24px">
+          <div class="ai-text" id="analysis-text"></div>
         </div>
-      </div>
-    </section>
 
-    <!-- History Section -->
-    <section id="history-section" class="hidden">
-      <div class="glass" style="padding:28px">
-        <div class="card-header">
-          <span class="card-title" data-i18n>Analysis History</span>
-        </div>
-        <div id="history-list" style="display:flex;flex-direction:column"></div>
-        <div id="pagination" style="display:flex;justify-content:center;gap:8px;margin-top:20px"></div>
       </div>
-    </section>
-  </div>
+    </div>
+  </section>
 
-  <script src="./js/i18n.js"></script>
-  <script src="./js/api.js"></script>
-  <script src="./js/chart.js"></script>
-  <script src="./js/app.js"></script>
+  <!-- SECTION 3: RESET -->
+  <section class="section" id="sec-reset">
+    <div class="section-inner reset-content">
+      <h2 class="reset-title">分析完成</h2>
+      <p class="reset-sub">上传新的股票截图，开始下一次分析</p>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="scrollToSection(0)">上传新截图</button>
+        <button class="btn btn-ghost" onclick="openDrawer()">查看历史记录</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="./js/i18n.js"></script>
+<script src="./js/api.js"></script>
+<script src="./js/chart.js"></script>
+<script src="./js/app.js"></script>
 </body>
 </html>
