@@ -155,14 +155,127 @@ body{background:var(--bg)}
 .ai-text{font-size:15px;line-height:1.75;color:var(--t2)}
 .ai-text strong{color:var(--t1);font-weight:600}
 
+/* ── Expandable section ── */
+.expand-section{border-radius:var(--radius);overflow:hidden}
+.expand-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 22px;cursor:pointer;user-select:none;
+  font-size:14px;font-weight:600;color:var(--t1);
+  transition:background 0.2s var(--ease);
+}
+.expand-header:hover{background:rgba(255,255,255,0.03)}
+.expand-chevron{
+  font-size:12px;color:var(--t3);
+  transition:transform 0.3s var(--ease);
+  display:inline-block;
+}
+.expand-section.open .expand-chevron{transform:rotate(180deg)}
+.expand-body{
+  max-height:0;overflow:hidden;opacity:0;
+  transition:max-height 0.4s var(--ease), opacity 0.3s var(--ease), padding 0.3s var(--ease);
+  padding:0 22px;
+}
+.expand-section.open .expand-body{
+  max-height:3000px;opacity:1;padding:0 22px 20px;
+}
+.expand-section:not(.open) .expand-body{padding-top:0;padding-bottom:0}
+
+/* ── AI 速览 card ── */
+.speed-read-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:4px 12px;border-radius:100px;
+  background:rgba(59,130,246,0.12);color:#60a5fa;
+  font-size:11px;font-weight:600;letter-spacing:0.5px;
+  margin-bottom:20px;
+}
+.speed-read-body{display:flex;align-items:center;gap:28px;flex-wrap:wrap}
+.sr-metrics{flex:1;min-width:180px;display:flex;flex-direction:column;gap:12px}
+.sr-row{display:flex;align-items:center;gap:8px}
+.sr-label{font-size:12px;color:var(--t3);width:36px;flex-shrink:0}
+.sr-value{font-size:15px;font-weight:600;color:var(--t1)}
+.sr-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 10px;border-radius:100px;font-size:12px;font-weight:600;
+}
+.sr-badge.up{background:rgba(255,107,107,0.12);color:var(--up)}
+.sr-badge.down{background:rgba(81,207,102,0.12);color:var(--down)}
+.sr-badge.neutral{background:rgba(245,158,11,0.12);color:var(--accent)}
+.sr-badge.risk-low{background:rgba(81,207,102,0.12);color:#51cf66}
+.sr-badge.risk-mid{background:rgba(245,158,11,0.12);color:var(--accent)}
+.sr-badge.risk-high{background:rgba(255,107,107,0.12);color:var(--up)}
+.sr-summary{
+  margin-top:18px;padding-top:16px;border-top:1px solid var(--border);
+  font-size:14px;color:var(--t2);line-height:1.6;
+}
+.sr-suggestion{font-size:14px;color:var(--t1);font-weight:500}
+
+/* ── AI explanation items ── */
+.explain-item{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:12px 14px;margin-bottom:8px;
+  border-radius:12px;background:rgba(255,255,255,0.02);
+  border:1px solid var(--border);
+}
+.explain-icon{
+  width:32px;height:32px;border-radius:8px;
+  background:rgba(59,130,246,0.1);color:#60a5fa;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;flex-shrink:0;
+}
+.explain-text{font-size:14px;color:var(--t2);line-height:1.65;padding-top:5px}
+
+/* ── Professional details table ── */
+.pro-section-title{
+  font-size:11px;font-weight:600;color:var(--t3);
+  text-transform:uppercase;letter-spacing:1px;
+  padding:8px 14px;margin-bottom:4px;
+  border-bottom:1px solid var(--border);
+}
+.pro-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:9px 14px;font-size:13px;
+  border-radius:8px;transition:background 0.15s;
+}
+.pro-row:hover{background:rgba(255,255,255,0.02)}
+.pro-row-label{color:var(--t3)}
+.pro-row-value{color:var(--t1);font-weight:500;font-variant-numeric:tabular-nums}
+.pro-detail-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:6px;
+}
+.pro-detail-block{
+  padding:12px 14px;border-radius:10px;
+  background:rgba(255,255,255,0.02);border:1px solid var(--border);
+}
+.pro-block-title{font-size:11px;color:var(--t3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px}
+.pro-block-row{display:flex;justify-content:space-between;font-size:13px;color:var(--t2);margin-bottom:4px}
+.pro-block-row span:last-child{color:var(--t1);font-weight:500}
+.tag-row{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-block;padding:4px 10px;border-radius:8px;font-size:11px;background:rgba(255,255,255,0.05);color:var(--t2)}
+
+/* ── Mode toggle ── */
+.mode-dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mode-beginner-dot{background:#51cf66;box-shadow:0 0 6px rgba(81,207,102,0.5)}
+.mode-pro-dot{background:#60a5fa;box-shadow:0 0 6px rgba(96,165,250,0.5)}
+
+/* ── Help popover ── */
+.help-popover{
+  background:var(--surface);color:var(--t2);font-size:12px;line-height:1.6;
+  padding:14px 16px;border-radius:12px;border:1px solid var(--border-strong);
+  box-shadow:0 8px 32px rgba(0,0,0,0.6);
+  animation:helpFadeIn 0.2s ease;
+}
+.help-popover strong{color:var(--t1);font-size:13px}
+@keyframes helpFadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
 /* ── Responsive ── */
 @media(max-width:768px){
-  .analysis-panels,.strategy-grid{grid-template-columns:1fr}
   .stock-hero{flex-direction:column}
   .stock-price{font-size:32px}
   .hero-title{font-size:32px}
+  .speed-read-body{flex-direction:column;align-items:flex-start}
   .drawer{width:100vw}
   .section{padding:24px 16px}
+  .pro-detail-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -177,6 +290,7 @@ body{background:var(--bg)}
     <span class="nav-logo-text">SnapVision</span>
   </div>
   <div class="nav-actions">
+    <button class="nav-btn" onclick="openWatchlistDrawer()" id="btn-watchlist-nav">⭐ 我的关注</button>
     <button class="nav-btn" onclick="openDrawer()" data-i18n>History</button>
     <button class="nav-btn" onclick="I18n.toggle()" id="lang-switch" data-i18n>EN</button>
   </div>
@@ -191,6 +305,16 @@ body{background:var(--bg)}
   </div>
   <div id="drawer-list"></div>
   <div class="drawer-pagination" id="drawer-pagination"></div>
+</div>
+
+<!-- Watchlist Drawer -->
+<div class="drawer-overlay" id="wl-overlay" onclick="closeWatchlistDrawer()"></div>
+<div class="drawer" id="wl-drawer">
+  <div class="drawer-header">
+    <span class="drawer-title">⭐ 我的关注</span>
+    <button class="drawer-close" onclick="closeWatchlistDrawer()">✕</button>
+  </div>
+  <div id="wl-list"></div>
 </div>
 
 <!-- Scroll Container -->
@@ -223,6 +347,7 @@ body{background:var(--bg)}
     <div class="section-inner">
       <div class="analysis-layout">
 
+        <!-- Stock Hero + Charts -->
         <div class="glass" style="padding:28px">
           <div class="stock-hero">
             <div><div class="stock-name" id="stock-name">--</div><div class="stock-code" id="stock-code">--</div></div>
@@ -232,48 +357,65 @@ body{background:var(--bg)}
           <div class="chart-wrap vol"><canvas id="volume-chart"></canvas></div>
         </div>
 
-        <div class="analysis-panels">
-          <div class="glass" style="padding:20px">
-            <div class="signal-row"><span class="signal-label">趋势方向</span><span class="signal-value" id="trend-direction">--</span></div>
-            <div class="signal-row"><span class="signal-label">信号强度</span><span class="signal-value" id="signal-strength">--</span></div>
-            <div class="signal-row"><span class="signal-label">风险等级</span><span class="signal-value" id="risk-level">--</span></div>
-            <div class="signal-row"><span class="signal-label">MACD</span><span class="signal-value" id="macd-value">--</span></div>
-            <div class="signal-row"><span class="signal-label">支撑位</span><span class="signal-value" id="support-value">--</span></div>
-            <div class="signal-row"><span class="signal-label">压力位</span><span class="signal-value" id="resistance-value">--</span></div>
-            <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-                <span style="font-size:13px;font-weight:700" id="sector-name">--</span>
-                <span class="badge badge-neutral" id="sector-heat">--</span>
-              </div>
-              <div class="tag-row" id="sector-concepts" style="margin-bottom:10px"></div>
-              <div class="sector-scroll" id="sector-cards"></div>
-            </div>
-          </div>
-          <div class="glass" style="padding:24px;display:flex;flex-direction:column;align-items:center;gap:18px">
-            <div class="score-ring">
-              <svg width="140" height="140" viewBox="0 0 140 140">
-                <circle cx="70" cy="70" r="60" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
-                <circle id="score-arc" cx="70" cy="70" r="60" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-dasharray="377" stroke-dashoffset="377" transform="rotate(-90 70 70)"/>
+        <!-- ═══ Layer 1: AI 速览 (always visible) ═══ -->
+        <div class="glass" style="padding:28px" id="speed-read-card">
+          <div class="speed-read-badge">🤖 AI 速览</div>
+          <div class="speed-read-body">
+            <div class="score-ring" style="width:120px;height:120px;flex-shrink:0">
+              <svg width="120" height="120" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
+                <circle id="score-arc" cx="60" cy="60" r="52" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-dasharray="327" stroke-dashoffset="327" transform="rotate(-90 60 60)"/>
               </svg>
               <div class="score-inner">
-                <div class="score-num" id="score-num">--</div>
-                <div class="score-label">AI 综合评分</div>
+                <div class="score-num" id="score-num" style="font-size:34px">--</div>
+                <div class="score-label">AI 评分</div>
               </div>
             </div>
-            <div style="display:flex;gap:12px;width:100%">
-              <div style="flex:1;text-align:center"><div class="m-label">趋势</div><div class="m-badge" id="score-trend">--</div></div>
-              <div style="flex:1;text-align:center"><div class="m-label">风险</div><div class="m-badge" id="score-risk">--</div></div>
+            <div class="sr-metrics">
+              <div class="sr-row">
+                <span class="sr-label">趋势</span>
+                <span class="sr-badge neutral" id="sr-trend">--</span>
+              </div>
+              <div class="sr-row">
+                <span class="sr-label">风险</span>
+                <span class="sr-badge neutral" id="sr-risk">--</span>
+              </div>
+              <div class="sr-row">
+                <span class="sr-label">建议</span>
+                <span class="sr-suggestion" id="sr-suggestion">--</span>
+              </div>
             </div>
-            <div style="width:100%;border-top:1px solid var(--border);padding-top:14px;display:flex;flex-direction:column;gap:8px">
-              <div class="strat-row"><span>操作倾向</span><span class="strat-val" id="strategy-bias">--</span></div>
-              <div class="strat-row"><span>置信度</span><span class="strat-val" id="strategy-confidence">--</span></div>
-              <div class="strat-row"><span>止损 / 止盈</span><span class="strat-val s-sm"><span id="strategy-stop">--</span> / <span id="strategy-take">--</span></span></div>
-              <div class="strat-row"><span>仓位建议</span><span class="strat-val" id="strategy-position">--</span></div>
-            </div>
+          </div>
+          <div class="sr-summary" id="sr-summary">上传股票截图，AI 将自动生成综合分析</div>
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:10px">
+            <button class="btn btn-primary" id="btn-add-watchlist" style="padding:8px 20px;font-size:13px" onclick="addToWatchlist()">⭐ 加入关注</button>
           </div>
         </div>
 
-        <div class="glass" style="padding:24px">
+        <!-- ═══ Layer 2: AI 解释 (expandable) ═══ -->
+        <div class="glass expand-section" id="expand-explain">
+          <div class="expand-header" onclick="toggleExpand('expand-explain')">
+            <span>💡 AI 分析依据</span>
+            <span class="expand-chevron" id="expand-explain-chevron">▼</span>
+          </div>
+          <div class="expand-body" id="expand-explain-body">
+            <div id="explain-list"></div>
+          </div>
+        </div>
+
+        <!-- ═══ Layer 3: 专业详情 (expandable, default collapsed) ═══ -->
+        <div class="glass expand-section" id="expand-details">
+          <div class="expand-header" onclick="toggleExpand('expand-details')">
+            <span>🔬 专业详情</span>
+            <span class="expand-chevron" id="expand-details-chevron">▼</span>
+          </div>
+          <div class="expand-body" id="expand-details-body">
+            <div id="pro-details-content"></div>
+          </div>
+        </div>
+
+        <!-- Full AI analysis text (inside professional details for reference) -->
+        <div class="glass" style="padding:24px" id="analysis-text-wrap" hidden>
           <div class="ai-text" id="analysis-text"></div>
         </div>
 

@@ -60,3 +60,18 @@ CREATE TABLE IF NOT EXISTS klines (
 CREATE INDEX IF NOT EXISTS idx_analyses_stock_code ON analyses(stock_code);
 CREATE INDEX IF NOT EXISTS idx_analyses_created_at ON analyses(created_at);
 CREATE INDEX IF NOT EXISTS idx_klines_analysis_id ON klines(analysis_id);
+
+-- AI 自选股 (Watchlist) 表
+CREATE TABLE IF NOT EXISTS watchlists (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  stock_code TEXT NOT NULL,
+  stock_name TEXT NOT NULL,
+  signal_strength INTEGER DEFAULT 0,
+  signal_risk TEXT DEFAULT 'medium',
+  signal_trend TEXT DEFAULT '',
+  analysis_id TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_watchlists_stock_code ON watchlists(stock_code);
+CREATE INDEX IF NOT EXISTS idx_watchlists_created_at ON watchlists(created_at);

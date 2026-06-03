@@ -1,8 +1,7 @@
+const http = require('http');
 const OCRParser = require('../utils/ocrParser');
-const { execFile } = require('child_process');
 const path = require('path');
 const sharp = require('sharp');
-const { promisify } = require('util');
 const { v4: uuidv4 } = require('uuid');
 
 const AnalysisModel = require('../models/analysis');
@@ -21,7 +20,41 @@ const AI_SignalEngine = require('../ai/signalEngine');
 const StrategyEngine  = require('../ai/strategyEngine');
 const ReportGenerator = require('../ai/reportGenerator');
 
-const execFileAsync = promisify(execFile);
+// ── OCR HTTP helper ─────────────────────────────────
+const OCR_URL = 'http://127.0.0.1:5002';
+
+function ocrHttpPost(imagePath) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({ image_path: imagePath, timeout_ms: 90000 });
+    const req = http.request(`${OCR_URL}/ocr`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+      timeout: 90000,
+    }, (res) => {
+      let data = '';
+      res.on('data', (c) => (data += c));
+      res.on('end', () => {
+        // Step 1: Check HTTP status — reject immediately if not 200
+        if (res.statusCode !== 200) {
+          const snippet = data.slice(0, 200).replace(/\n/g, ' ');
+          return reject(new Error(`OCR server returned HTTP ${res.statusCode}: ${snippet}`));
+        }
+        // Step 2: Parse JSON
+        try {
+          const json = JSON.parse(data);
+          if (json.success) resolve(json);
+          else reject(new Error(json.error || 'OCR failed (no error detail)'));
+        } catch (e) {
+          reject(new Error(`OCR response is not JSON: ${data.slice(0, 120)}`));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('OCR request timeout')); });
+    req.write(body);
+    req.end();
+  });
+}
 
 function parseOcrTexts(stdout) {
   const text = String(stdout || '').trim();
@@ -75,10 +108,21 @@ class AnalysisController {
         return res.status(400).json({ error: '请上传图片文件' });
       }
 
-      // ── 步骤1: OCR 识别 ──
+      // ── 性能计时器（深挖版） ──
+      const T = {};
+      const MARK = (key) => { T[key] = performance.now(); };
+      const ELAPSED = (key) => ((performance.now() - (T[key] || 0)) / 1000).toFixed(1);
+      const LOG = (key) => { const s = ELAPSED(key); console.log(`[PERF] ${key}: ${s}s`); return s; };
+      MARK('total');
+      MARK('handler_entry');
+
+      const reqOverhead = LOG('handler_entry');
+      console.log(`[PERF] 请求处理（multer+参数解析）: ${reqOverhead}s`);
+
+      // ── 图片压缩（从未被计时） ──
+      MARK('img_compress');
       const fileStockInfo = KlineParser.extractStockInfo(req.file.originalname);
       const imagePath = path.resolve(__dirname, '..', req.file.path);
-      const ocrPath = path.resolve(__dirname, '..', 'ocr.py');
 
       // 压缩图片，降低 OCR 内存占用
       const compressedPath = `${imagePath}_small.jpg`;
@@ -86,30 +130,24 @@ class AnalysisController {
         .resize(1280, 1280, { fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: 80 })
         .toFile(compressedPath);
+      const imgCompressSec = LOG('img_compress');
 
-      const pythonBin = process.env.PYTHON_BIN || 'python3';
+      // ── 步骤1: OCR 识别（常驻服务 HTTP POST） ──
+      MARK('ocr');
 
-      const { stdout, stderr } = await execFileAsync(
-        pythonBin,
-        [ocrPath, compressedPath],
-        {
-          maxBuffer: 10 * 1024 * 1024,
-          env: {
-            ...process.env,
-            PYTHONUNBUFFERED: '1'
-          }
-        }
-      );
+      const ocrResult = await ocrHttpPost(compressedPath);
+      const ocrTextsRaw = ocrResult.texts || (ocrResult.text ? ocrResult.text.split('\n').filter(Boolean) : []);
 
-      if (stderr && process.env.NODE_ENV === 'development') {
-        console.error('OCR stderr:', stderr);
-      }
+      const ocrSec = ELAPSED('ocr');
+      console.log(`[PERF] OCR识别: ${ocrSec}s (${ocrResult.elapsed_ms || '?'}ms on server)`);
 
-      const ocrTexts = parseOcrTexts(stdout);
+      MARK('ocr_clean');
+      const ocrTexts = parseOcrTexts(JSON.stringify(ocrTextsRaw));
       console.log('📷 OCR Result:', ocrTexts);
 
       const parsedData = OCRParser.parse(ocrTexts);
       console.log('📋 Parsed Data:', JSON.stringify(parsedData));
+      const ocrCleanSec = ELAPSED('ocr_clean');
 
       // ── 步骤2: 确定股票代码 ──
       const stockName = parsedData.stock_name !== '未知股票'
@@ -123,6 +161,7 @@ class AnalysisController {
       console.log(`🎯 Initial stock: ${stockName} (${stockCode})`);
 
       // ── 步骤3: 获取真实行情数据 ──
+      MARK('market');
       let klines = [];
       let quote = null;
       let marketFetchError = null;
@@ -154,8 +193,11 @@ class AnalysisController {
         marketFetchError = err.message;
         console.warn(`⚠️ 行情服务异常: ${err.message}`);
       }
+      const marketSec = ELAPSED('market');
+      console.log(`[PERF] 行情获取: ${marketSec}s`);
 
       // ── 步骤4: 技术指标计算（基于真实数据） ──
+      MARK('indicators');
       const closePrices = klines.length > 0
         ? klines.map(k => safeNumber(k.close)).filter(v => v > 0)
         : [];
@@ -192,6 +234,8 @@ class AnalysisController {
         : 0;
 
       console.log(`📊 指标计算完成 — MACD:${macdData.macd.toFixed(3)} 趋势:${trend.direction}/${trend.strength}`);
+      const indicatorsSec = ELAPSED('indicators');
+      console.log(`[PERF] 指标计算: ${indicatorsSec}s`);
 
       // ── 步骤5: 名称与价格修正 ──
       // 行情 API 返回的名称最可靠，覆盖 OCR/文件名
@@ -221,6 +265,7 @@ class AnalysisController {
       const histogram  = macdData.histogram !== 0 ? macdData.histogram : safeNumber(parsedData.macd);
 
       // ── 步骤6: AI 分析报告 ──
+      MARK('ai_local');
       const aiReport = AIAnalysisService.generateReport({
         stockInfo: {
           code: stockCode,
@@ -266,8 +311,11 @@ class AnalysisController {
         avg_volume: avgVol,
       });
       console.log(`📡 信号引擎: ${signal.trend} | 强度:${signal.signal_strength} | 风险:${signal.risk_level}`);
+      const aiLocalSec = ELAPSED('ai_local');
+      console.log(`[PERF] 本地分析: ${aiLocalSec}s`);
 
       // ── 步骤6.6: 板块 + 相关股票 ──
+      MARK('sector');
       let sector = { industry:'', change_percent:0, heat:'中性', description:'', concepts:[], region:'' };
       let relatedStocks = [];
       try {
@@ -277,6 +325,11 @@ class AnalysisController {
       } catch (err) {
         console.warn(`⚠️ 板块信息获取失败: ${err.message}`);
       }
+      const sectorSec = ELAPSED('sector');
+      console.log(`[PERF] 板块+相关股票: ${sectorSec}s`);
+
+      // ── 未计时区间开始：AI 推理层 + 报告生成 ──
+      MARK('ai_inference');
 
       // ═══════════════════════════════════════
       // ── AI 推理层（新架构） ──
@@ -339,8 +392,11 @@ class AnalysisController {
         },
       };
       const aiReportV2 = ReportGenerator.generate(unifiedData);
+      const aiInferenceSec = LOG('ai_inference');
+      console.log(`[PERF] AI推理层（新架构）: ${aiInferenceSec}s`);
 
       // ── 步骤7: 指标分析摘要（保留兼容） ──
+      MARK('summary_gen');
       const indicatorSummary = closePrices.length > 0
         ? Indicators.generateAnalysis(klines, {
             macd: macdLine,
@@ -352,7 +408,11 @@ class AnalysisController {
           })
         : { analysis: '', recommendation: '中性' };
 
+      const summarySec = LOG('summary_gen');
+      console.log(`[PERF] 指标摘要生成: ${summarySec}s`);
+
       // ── 步骤8: 组装响应 ──
+      MARK('response_assemble');
       const analysis = {
         id: uuidv4(),
         stock_code: stockCode,
@@ -415,7 +475,16 @@ class AnalysisController {
         _parsed_data: parsedData,
       };
 
+      const assembleSec = LOG('response_assemble');
+      console.log(`[PERF] 响应组装: ${assembleSec}s`);
+
+      MARK('db_save');
+      const totalSec = ELAPSED('total');
+      console.log(`[PERF] 后端总耗时: ${totalSec}s`);
+
       await AnalysisModel.save(analysis);
+      const dbSaveSec = LOG('db_save');
+      console.log(`[PERF] 数据库保存: ${dbSaveSec}s`);
 
       const { kline_data, _ocr_texts, _parsed_data, ...responseData } = analysis;
 
@@ -427,6 +496,21 @@ class AnalysisController {
         message: marketFetchError
           ? `分析完成（行情获取失败：${marketFetchError}，部分数据可能不准确）`
           : '分析完成',
+        _timings: {
+          '请求处理': reqOverhead,
+          '图片压缩': imgCompressSec,
+          'OCR识别': ocrSec,
+          'OCR清洗': ocrCleanSec,
+          '行情获取': marketSec,
+          '指标计算': indicatorsSec,
+          '本地分析': aiLocalSec,
+          '板块信息': sectorSec,
+          'AI推理层': aiInferenceSec,
+          '摘要生成': summarySec,
+          '响应组装': assembleSec,
+          '数据库保存': dbSaveSec,
+          '后端总耗时': totalSec,
+        },
       });
     } catch (error) {
       console.error('Analysis error:', error);
