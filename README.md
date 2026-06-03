@@ -23,8 +23,8 @@ SnapVision 可以通过 OCR 识别股票截图，结合实时行情 API 与 AI �
 - 📊 MA / MACD technical indicators  
   技术指标分析
 
-- 🪟 Apple-inspired Liquid Glass UI  
-  Apple 风格 Liquid Glass UI
+- 🪟 Liquid Glass UI  
+ Liquid Glass UI
   
   # 相较于0.2 版本的改动有：
 
