@@ -84,7 +84,7 @@ SnapVision v0.3 Beta 已进入真实用户测试阶段。
 
 ---
 
-SnapVision Beta v0.2 — Mac Quick Start
+SnapVision Beta v0.3 — Mac Quick Start
 Requirements
 macOS
 Node.js 18+
@@ -117,7 +117,7 @@ This is a local beta version.
 OCR and analysis may take a few seconds on first run.
 If the OCR model is downloading, wait until it finishes.
 Win 版使用教程（English）
-SnapVision Beta v0.2 — Windows Quick Start
+SnapVision Beta v0.3 — Windows Quick Start
 Requirements
 Windows 10 / 11
 Node.js 18+
