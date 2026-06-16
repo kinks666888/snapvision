@@ -1,7 +1,7 @@
 {
   "name": "snapvision-backend",
-  "version": "1.0.0",
-  "description": "SnapVision - Stock Analysis API Server",
+  "version": "0.2.0",
+  "description": "SnapVision Beta v0.2 — AI Stock Analysis API Server",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

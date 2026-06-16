@@ -3,18 +3,8 @@
  * 更稳的请求封装与返回值标准化
  */
 
-// Auto-detect backend URL (support different ports)
-const API_BASE_URL = (() => {
-  let hostname = window.location.hostname;
-
-  // If opened via file:// protocol, use localhost
-  if (!hostname || hostname === '') {
-    hostname = 'localhost';
-  }
-
-  const port = 5001; // Backend port
-  return `http://${hostname}:${port}/api`;
-})();
+// Backend serves frontend on same port — relative API path
+const API_BASE_URL = '/api';
 
 console.log('📡 API Base URL:', API_BASE_URL);
 
@@ -48,7 +38,10 @@ function normalizeAnalysis(data) {
     macd: toNumber(data.macd, 0),
     signal: toNumber(data.signal, 0),
     macd_histogram: toNumber(data.macd_histogram, 0),
-    kline: Array.isArray(data.kline) ? data.kline : [],
+    kline: Array.isArray(data.kline) ? data.kline
+      : Array.isArray(data.kline_data) ? data.kline_data
+      : Array.isArray(data.klines) ? data.klines
+      : [],
   };
 }
 
@@ -195,6 +188,51 @@ class APIClient {
     } catch (error) {
       console.error('Search error:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Get watchlist
+   */
+  static async getWatchlist() {
+    try {
+      const data = await fetchJson(`${API_BASE_URL}/watchlist`);
+      return Array.isArray(data?.data) ? data.data : [];
+    } catch (error) {
+      console.error('Watchlist error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Add to watchlist
+   */
+  static async addToWatchlist(item) {
+    try {
+      const data = await fetchJson(`${API_BASE_URL}/watchlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item),
+      });
+      return data;
+    } catch (error) {
+      console.error('Add watchlist error:', error);
+      throw new Error(error.message || '添加关注失败');
+    }
+  }
+
+  /**
+   * Remove from watchlist
+   */
+  static async removeFromWatchlist(id) {
+    try {
+      const data = await fetchJson(`${API_BASE_URL}/watchlist/${id}`, {
+        method: 'DELETE',
+      });
+      return data;
+    } catch (error) {
+      console.error('Remove watchlist error:', error);
+      throw new Error(error.message || '取消关注失败');
     }
   }
 }
